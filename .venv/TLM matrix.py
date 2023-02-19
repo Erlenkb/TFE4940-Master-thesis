@@ -7,7 +7,11 @@ import matplotlib.cm
 import matplotlib.colorbar
 import matplotlib.colors
 
-def _create_TLM(nx, ny, nz):
+def _create_TLM(delta_d, height, width, length):
+    ny = delta_d / width
+    nx = delta_d / length
+    nz = height / delta_d
+
     tlm = np.zeros((nx,ny,nz,6))
     for x in range(nx):
         for y in range(ny):
@@ -16,6 +20,60 @@ def _create_TLM(nx, ny, nz):
     scatter_grid = tlm
     pressure_grid = tlm
     return tlm, scatter_grid, pressure_grid
+
+
+
+def Room_shape(tlm, box_height, box_width, box_length, delta_d):
+    ny = box_width / delta_d
+    nx = box_length / delta_d
+    nz = box_height / delta_d
+
+    for i in range(nx):
+        for j in range(ny):
+            for k in range(nz):
+                
+    
+    
+def Diffusor(tlm, delta_d):
+    
+    
+    
+    
+
+    
+
+def front(tlm,):
+
+    
+   
+    
+def back(tlm):
+
+def top(tlm):
+
+def Right(tlm):
+    
+def Left(tlm):
+
+def bottom(tlm):
+    
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def _create_P_grid(Scatter, Pressure):
     list = [2, 3, 0, 1, 5, 4]
