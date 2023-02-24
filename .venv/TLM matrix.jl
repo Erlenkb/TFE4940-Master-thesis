@@ -166,11 +166,101 @@ corners = [5 5 5; 5 7 5; 5 7 7; 5 5 7; 7 5 7; 7 5 5; 7 7 5; 7 7 7]
 d = 1
 
 
+function merges(A::Int64, B::Int64)::Int64
+    B_digits = [parse(Int64, digit) for digit in string(B)]
+    A_digits = [parse(Int64, digit) for digit in string(A)]
+    for digit in B_digits
+        if !(digit in A_digits)
+            push!(A_digits, digit)
+        end
+    end
+    return parse(Int64, join(sort(A_digits)))
+end
 
 
+function merge(A::Float64, B::Float64)
+    # Convert A and B to integers
+    int_A = round(Int, A)
+    int_B = round(Int, B)
+
+    # Increment int_A by int_B
+    int_result = int_A + int_B
+
+    # Convert int_result to string to remove duplicates
+    str_result = string(int_result)
+
+    # Remove duplicates and convert back to integer
+    int_result = parse(Int, join(Set(str_result)))
+
+    return int_result
+end
 
 
+function place_wall(arr::Array{Float64, 3}, x_pos::Array{Float64, 1}, y_pos::Array{Float64, 1}, z_pos::Array{Float64, 1}, Δd::Float64)
+    
+    
 
+    if x_pos[1]==x_pos[2]
+        println("X pos is plane")
+        for i in 1:size(arr,1)
+            for j in Int(ceil(y_pos[1]/Δd)):Int(floor(y_pos[2]/Δd))
+                for k in Int(ceil(z_pos[1]/Δd)):Int(floor(z_pos[2]/Δd))
+                    B = arr[i,j,k]
+                    if (((i*Δd - x_pos[1] >= -Δd)) && ((i*Δd - x_pos[1]) < 0))
+                        X = 2.0
+                        arr[i,j,k] = merge(B,X)
+                    elseif (((i*Δd - x_pos[1]) <= Δd) && ((i*Δd - x_pos[1]) > 0))
+                        X = 1.0
+                        arr[i,j,k] = merge(B,X)
+                        
+                    end
+                        
+                end
+            end
+        end
+
+        
+    elseif y_pos[1] == y_pos[2]
+        println("Y pos is plane")
+        for i in Int(ceil(x_pos[1]/Δd)):Int(floor(x_pos[2]/Δd))
+            for j in 1:size(arr,2)
+                for k in Int(ceil(z_pos[1]/Δd)):Int(floor(z_pos[2]/Δd))
+                    B = arr[i,j,k]
+                    if (((j*Δd - y_pos[1]) >= -Δd) && ((j*Δd - y_pos[1]) < 0))
+                        Y = 4.0
+                        arr[i,j,k] = merge(B,Y)
+                    elseif (((j*Δd - y_pos[1]) <= Δd) && ((j*Δd - y_pos[1]) > 0))
+                        Y = 3.0
+                        arr[i,j,k] = merge(B,Y)
+                    end
+                        
+                end
+            end
+        end
+    elseif z_pos[1] == z_pos[2]
+        println("Z pos is plane")
+        for i in Int(ceil(x_pos[1]/Δd)):Int(floor(x_pos[2]/Δd))
+            for j in Int(ceil(y_pos[1]/Δd)):Int(floor(y_pos[2]/Δd))
+                for k in 1:size(arr,3)
+                    B = arr[i,j,k]
+                    if (((k*Δd - z_pos[1]) >= -Δd) && ((k*Δd - z_pos[1]) < 0))
+                        Z = 6.0
+                        arr[i,j,k] = merge(B,Z)
+                    elseif (((k*Δd - z_pos[1]) <= Δd) && ((k*Δd - z_pos[1]) > 0))
+                        Z = 5.0
+                        arr[i,j,k] = merge(B,Z)
+
+                    end
+                        
+                end
+            end
+        end
+    else
+        println("Not a wall")
+    end
+
+    return arr
+end
 
 """
 # First try at replacing surfaces with the value 1 ---- trashed due to unecessary complexity
@@ -188,10 +278,27 @@ end
 
 """
 
+
+
 Labeled_tlm = TLM(1, 10, 10, 10)
 
 IW = TLM(1, 4, 3, 3);
 
-IWE = create_shoebox(1, 12, 12, 12)
-IWE2 = mark_box_walls(IWE, d, corners)
+x = [5.0,5.0]
+y = [3.4,6.2]
+z = [2.0,4.0]
+
+x2 = [0.65,0.94]
+y2 = [1.01,1.01]
+z2 = [0.19,0.]
+
+Δd = 0.15
+
+
+IWE = create_shoebox(Δd, 12, 12, 12)
+IWE2 = place_wall(IWE, x, y, z, Δd)
+IWE3 = place_wall(IWE2, x2, y2, z2, Δd)
+
+
+
 
