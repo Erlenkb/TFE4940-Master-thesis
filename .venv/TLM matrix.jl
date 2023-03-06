@@ -1,5 +1,33 @@
 using LinearAlgebra
-R = [1, 1, 1, 1, 1, 1, 1]
+using Plots
+
+
+"""
+GNSH - Tool for Julia - Mesh generator
+Sketchup - Draw grid/walls
+"""
+
+
+####### GLOBAL PARAMETERS ########
+
+Temp = 291
+ρ_air = 1.225
+c = 343.2*sqrt(Temp/293)
+
+impulse = true
+imp_pos = [1,1,1]
+imp_val_p = 1
+harmonic = false
+harm_pos = [4,4,4]
+harmonic_directional = false
+freq = 500
+po = 2*10^(-5)
+A = 1
+
+R = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+
+
+##################################
 
 
 function TLM(Δd, height, width, length)
@@ -29,11 +57,28 @@ end
 # surface, edge or corner. 
 function create_shoebox(Δd, height, width, length)
     
-    nx = length ÷ Δd
-    ny = width ÷ Δd
-    nz = height ÷ Δd
+    nx = Int(length ÷ Δd - 1)
+    ny = Int(width ÷ Δd - 1)
+    nz = Int(height ÷ Δd - 1)
 
-    box = zeros((nx,ny,nz))
+    box = zeros(Int, (nx,ny,nz))
+    box1 = zeros((nx,ny,nz))
+
+    SN = box1
+    SE = box1
+    SS = box1
+    SW = box1
+    SU = box1
+    SD = box1
+    PN = box1
+    PE = box1
+    PS = box1
+    PW = box1
+    PU = box1
+    PD = box1
+    pressure_grid = box1
+
+
     # Set surface values by checking the position
     for i in 1:nx
         for j in 1:ny
@@ -116,19 +161,19 @@ function create_shoebox(Δd, height, width, length)
             end
         end
     end
-    return box
+    return box, pressure_grid, SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD
 end
 
 
-function case(n::Int)
+function case(n::Int64)
     Diffusor = false
     if n < 0
         Diffusor = true
         n = abs(n)
     end
-    num_str = string(num)
+    num_str = string(n)
     used_nums = [parse(Int, digit) for digit in num_str]
-    all_nums = set(1:6)
+    all_nums = Set(1:6)
     unused_nums = setdiff(collect(all_nums), used_nums)
 
     return used_nums, unused_nums, Diffusor
@@ -177,11 +222,6 @@ function mark_box_walls(arr::Array{Float64,3}, d, corners)
     end
     return arr
 end
-
-
-corners = [5 5 5; 5 7 5; 5 7 7; 5 5 7; 7 5 7; 7 5 5; 7 7 5; 7 7 7]
-d = 1
-
 
 function merges(A::Int64, B::Int64)::Int64
     B_digits = [parse(Int64, digit) for digit in string(B)]
@@ -279,7 +319,7 @@ function place_wall(arr::Array{Float64, 3}, x_pos::Array{Float64, 1}, y_pos::Arr
     return arr
 end
 
-function calculate_pressure_matrix(Labeled_tlm::Array{Float64,3}, SN::Array{Float64,3}, SE::Array{Float64,3}, SS::Array{Float64,3}, SW::Array{Float64,3}, SU::Array{Float64,3}, SD::Array{Float64,3},PN::Array{Float64,3}, PE::Array{Float64,3}, PS::Array{Float64,3}, PW::Array{Float64,3}, PU::Array{Float64,3}, PD::Array{Float64,3})
+function calculate_pressure_matrix(Labeled_tlm::Array{Int64,3}, SN::Array{Float64,3}, SE::Array{Float64,3}, SS::Array{Float64,3}, SW::Array{Float64,3}, SU::Array{Float64,3}, SD::Array{Float64,3},PN::Array{Float64,3}, PE::Array{Float64,3}, PS::Array{Float64,3}, PW::Array{Float64,3}, PU::Array{Float64,3}, PD::Array{Float64,3})
     for i in 1:size(Labeled_tlm,1)
         for j in 1:size(Labeled_tlm,2)
             for k in 1:size(Labeled_tlm,3)
@@ -287,7 +327,7 @@ function calculate_pressure_matrix(Labeled_tlm::Array{Float64,3}, SN::Array{Floa
                     PN[i,j,k] = SS[i - 1, j, k]
                     PE[i,j,k] = SW[i, j + 1, k]
                     PS[i,j,k] = SN[i + 1, j, k]
-                    PW[i,k,k] = SE[i, j - 1, k]
+                    PW[i,j,k] = SE[i, j - 1, k]
                     PU[i,j,k] = SD[i, j, k + 1]
                     PD[i,j,k] = SU[i, j, k - 1]
                     continue
@@ -316,7 +356,7 @@ function calculate_pressure_matrix(Labeled_tlm::Array{Float64,3}, SN::Array{Floa
                         elseif n == 2
                             PS[i,j,k] = SN[i + 1, j, k]
                         elseif n == 3
-                            PW[i,k,k] = SE[i, j - 1, k]
+                            PW[i,j,k] = SE[i, j - 1, k]
                         elseif n == 4
                             PE[i,j,k] = SW[i, j + 1, k]
                         elseif n == 5
@@ -340,6 +380,7 @@ function calculate_scattering_matrix(SN::Array{Float64,3}, SE::Array{Float64,3},
     SS = (1/3) * (PW .+ PN .+ PE .- (2*PS) .+ PU .+ PD)
     SD = (1/3) * (PW .+ PN .+ PE .+ PS .- (2*PU) .+ PD)
     SU = (1/3) * (PW .+ PN .+ PE .+ PS .+ PU .- (2*PD))
+    return SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD
 end
 
 
@@ -359,12 +400,98 @@ end
 
 """
 
+function pressure_value(t::Float64)
+    return A*sin(t*2*pi*freq)
+end
+
+function pressure_value_directional(t::Float64)
+    return A*sin(t*2*pi*freq)*directivity_factor
+end
+
+
+function overal_pressure(PN::Array{Float64,3}, PE::Array{Float64,3}, PS::Array{Float64,3}, PW::Array{Float64,3}, PU::Array{Float64,3}, PD::Array{Float64,3})
+    P_grid = (1/3) * (PW .+ PN .+ PE .+ PS .+ PU .+ PD)
+    return P_grid
+end
+
+
+function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Array{Float64,3}, SE::Array{Float64,3}, SS::Array{Float64,3}, SW::Array{Float64,3}, SU::Array{Float64,3}, SD::Array{Float64,3},PN::Array{Float64,3}, PE::Array{Float64,3}, PS::Array{Float64,3}, PW::Array{Float64,3}, PU::Array{Float64,3}, PD::Array{Float64,3})
+    Δt = (Δd / c)
+    N = T ÷ Δt
+    p_node = [10, 10, 10]
+    p_arr = zeros(Int(N))
+
+    # Step 1 - Insert energy into grid
+        
+    # Use the global boolean parameter impulse if the initial scattering matrix will have an impulse signal
+    if impulse
+        i = imp_pos[1]
+        j = imp_pos[2]
+        k = imp_pos[3]
+        SN[i,j,k] = imp_val_p
+        SE[i,j,k] = imp_val_p
+        SS[i,j,k] = imp_val_p
+        SW[i,j,k] = imp_val_p
+        SU[i,j,k] = imp_val_p
+        SD[i,j,k] = imp_val_p
+    end
+
+    # Use the global boolean parameter harmonic if the grid should experience a harmonic time signal - Will work as a point source located at a single node 
+    if harmonic
+        i = harm_pos[1]
+        j = harm_pos[2]
+        k = harm_pos[3]
+        SN[i,j,k] = pressure_value(n*Δt)
+        SE[i,j,k] = pressure_value(n*Δt)
+        SS[i,j,k] = pressure_value(n*Δt)
+        SW[i,j,k] = pressure_value(n*Δt)
+        SU[i,j,k] = pressure_value(n*Δt)
+        SD[i,j,k] = pressure_value(n*Δt)
+    end
+
+    # Use the global boolean parameter harmonic_directional if the grid should experience a harmoncic time signal in only one direction / Weaker in some directions - Will be more general in the future.
+    if harmonic_directional
+        i = harm_pos[1]
+        j = harm_pos[2]
+        k = harm_pos[3]
+        SN[i,j,k] = pressure_value_directional(n*Δt)[1]
+        SE[i,j,k] = pressure_value_directional(n*Δt)[2]
+        SS[i,j,k] = pressure_value_directional(n*Δt)[3]
+        SW[i,j,k] = pressure_value_directional(n*Δt)[4]
+        SU[i,j,k] = pressure_value_directional(n*Δt)[5]
+        SD[i,j,k] = pressure_value_directional(n*Δt)[6]
+    end
+
+    for n in 1:N
+        # Iterate through the matrix with timesteps "n" for a given total time "T"
+        
+        # Step 2 - Calculate overall pressure
+        pressure_grid = overal_pressure(PN, PE, PS, PW, PU, PD)
+        p_arr[Int(n)] = pressure_grid[p_node[1],p_node[2],p_node[3]]
 
 
 
-Labeled_tlm = TLM(1, 10, 10, 10)
+        # Step 3 - Calculate the scattering matrix
+        SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD = calculate_scattering_matrix(SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD)
 
-IW = TLM(1, 4, 3, 3);
+        # Step 4 - Calculate the pressure matrix
+        SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD = calculate_pressure_matrix(Labeled_tlm, SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD)
+
+    end
+
+    x = range(0, stop=(N-1)*Δt, step=Δt)
+
+    plot(x, p_arr, label="Pressure values at node k")
+
+
+end
+
+
+
+
+#Labeled_tlm = TLM(1, 10, 10, 10)
+
+#IW = TLM(1, 4, 3, 3)
 
 x = [5.0,5.0]
 y = [3.4,6.2]
@@ -372,13 +499,22 @@ z = [2.0,4.0]
 
 x2 = [0.65,0.94]
 y2 = [1.01,1.01]
-z2 = [0.19,0.]
+z2 = [0.19,0.32]
 
-Δd = 0.15
+Δd = 0.1
 
 
-IWE = create_shoebox(Δd, 12, 12, 12)
-IWE2 = place_wall(IWE, x2, y2, z2, Δd)
+Labeled_tlm, pressure_grid, SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD = create_shoebox(Δd, 5, 3, 3)
+
+#println(Labeled_tlm)
+
+
+iterate_grid(0.03, Δd, pressure_grid, SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD)
+
+
+
+
+#Labeled_tlm = place_wall(IWE, x2, y2, z2, Δd)
 #IWE3 = place_wall(IWE2, x2, y2, z2, Δd)
 
 
