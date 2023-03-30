@@ -2,31 +2,33 @@ using LinearAlgebra
 using Plots
 
 
+
 """
-GNSH - Tool for Julia - Mesh generator
+GMSH - Tool for Julia - Mesh generator
 Sketchup - Draw grid/walls
+
+
+Time weighted L_fast 
 """
 
 
 ####### GLOBAL PARAMETERS ########
-
 Temp = 291
 ρ_air = 1.225
 c = 343.2*sqrt(Temp/293)
 
-impulse = true
-imp_pos = [1,1,1]
-imp_val_p = 1
-harmonic = false
-harm_pos = [4,4,4]
+impulse = false
+imp_pos = [20,20,20]
+imp_val_p = 10
+harmonic = true
+harm_pos = [20,20,20]
 harmonic_directional = false
-freq = 500
+freq = 100
 po = 2*10^(-5)
-A = 1
+A = 20
+fs = 3000
 
-R = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
-
-
+R = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
 ##################################
 
 
@@ -38,18 +40,6 @@ function TLM(Δd, height, width, length)
     tlm = zeros((nx,ny,nz))
     return tlm
 end
-"""
-function Create_Room(Δd, height, width, length)
-    nx = length ÷ Δd
-    ny = width ÷ Δd
-    nz = height ÷ Δd
-    box = zeros(Int, nx, ny, nz)
-    box[[1,end],:,:] .= 1
-    box[:,[1,end],:] .= 1
-    box[:,:, [1,end]] .= 1
-    return box
-end
-"""
 
 
 
@@ -57,26 +47,37 @@ end
 # surface, edge or corner. 
 function create_shoebox(Δd, height, width, length)
     
-    nx = Int(length ÷ Δd - 1)
-    ny = Int(width ÷ Δd - 1)
-    nz = Int(height ÷ Δd - 1)
+    nx = Int(length ÷ Δd + 1)
+    ny = Int(width ÷ Δd +1)
+    nz = Int(height ÷ Δd +1)
+
+    println("Creating Shoebox shape")
+    println("size:\t x_direction: ", nx*Δd, " m \t y_direction: ",ny*Δd," m \t z_direction: ", nz*Δd, " m")
 
     box = zeros(Int, (nx,ny,nz))
-    box1 = zeros((nx,ny,nz))
 
-    SN = box1
-    SE = box1
-    SS = box1
-    SW = box1
-    SU = box1
-    SD = box1
-    PN = box1
-    PE = box1
-    PS = box1
-    PW = box1
-    PU = box1
-    PD = box1
-    pressure_grid = box1
+    A = []
+
+    B = A
+    C = A
+    D = A
+
+    
+    SN = zeros((nx,ny,nz))
+    SE = zeros((nx,ny,nz))
+    SS = zeros((nx,ny,nz))
+    SW = zeros((nx,ny,nz))
+    SU = zeros((nx,ny,nz))
+    SD = zeros((nx,ny,nz))
+    PN = zeros((nx,ny,nz))
+    PE = zeros((nx,ny,nz))
+    PS = zeros((nx,ny,nz))
+    PW = zeros((nx,ny,nz))
+    PU = zeros((nx,ny,nz))
+    PD = zeros((nx,ny,nz))
+
+
+    pressure_grid = zeros((nx,ny,nz))
 
 
     # Set surface values by checking the position
@@ -253,6 +254,8 @@ function merge(A::Float64, B::Float64)
 end
 
 
+
+
 function place_wall(arr::Array{Float64, 3}, x_pos::Array{Float64, 1}, y_pos::Array{Float64, 1}, z_pos::Array{Float64, 1}, Δd::Float64)
     
     
@@ -324,18 +327,21 @@ function calculate_pressure_matrix(Labeled_tlm::Array{Int64,3}, SN::Array{Float6
         for j in 1:size(Labeled_tlm,2)
             for k in 1:size(Labeled_tlm,3)
                 if Labeled_tlm[i,j,k] == 0
+                    #println("Label = 0")
                     PN[i,j,k] = SS[i - 1, j, k]
                     PE[i,j,k] = SW[i, j + 1, k]
                     PS[i,j,k] = SN[i + 1, j, k]
                     PW[i,j,k] = SE[i, j - 1, k]
                     PU[i,j,k] = SD[i, j, k + 1]
                     PD[i,j,k] = SU[i, j, k - 1]
-                    continue
                 else
                     case_used, case_unused, diffusor = case(Labeled_tlm[i,j,k])
+                    #println("Case used: ", case_used, " - Case unused: ", case_unused, " - Diffusor: ", diffusor)
                     
                     for n in case_used
+                        #println("Case - used: ",n)
                         Refl = diffusor ? R[6] : R[n]
+                        #println("Reflection value: ", Refl)
                         if n == 1
                             PN[i,j,k] = Refl * SN[i,j,k]                        
                         elseif n == 2
@@ -351,6 +357,7 @@ function calculate_pressure_matrix(Labeled_tlm::Array{Int64,3}, SN::Array{Float6
                         end
                     end
                     for n in case_unused
+                        #println("Case - unused: ", n)
                         if n == 1
                             PN[i,j,k] = SS[i - 1, j, k]
                         elseif n == 2
@@ -369,12 +376,13 @@ function calculate_pressure_matrix(Labeled_tlm::Array{Int64,3}, SN::Array{Float6
             end
         end
     end
+    
     return SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD
 end
 
 
 function calculate_scattering_matrix(SN::Array{Float64,3}, SE::Array{Float64,3}, SS::Array{Float64,3}, SW::Array{Float64,3}, SU::Array{Float64,3}, SD::Array{Float64,3},PN::Array{Float64,3}, PE::Array{Float64,3}, PS::Array{Float64,3}, PW::Array{Float64,3}, PU::Array{Float64,3}, PD::Array{Float64,3})
-    SW = (1/3) * (-2*PW .+ PN .+ PE .+ PS .+ PU .+ PD)
+    SW = (1/3) * ((-2)*PW .+ PN .+ PE .+ PS .+ PU .+ PD)
     SN = (1/3) * (PW .- (2*PN) .+ PE .+ PS .+ PU .+ PD)
     SE = (1/3) * (PW .+ PN .- (2*PE) .+ PS .+ PU .+ PD)
     SS = (1/3) * (PW .+ PN .+ PE .- (2*PS) .+ PU .+ PD)
@@ -401,7 +409,7 @@ end
 """
 
 function pressure_value(t::Float64)
-    return A*sin(t*2*pi*freq)
+    return round(A*sin(t*2*pi*freq);digits=4)
 end
 
 function pressure_value_directional(t::Float64)
@@ -415,108 +423,286 @@ function overal_pressure(PN::Array{Float64,3}, PE::Array{Float64,3}, PS::Array{F
 end
 
 
+function time_to_discrete(timeval::Float64, fs::Int64)
+    return Int(timeval * fs)
+end
+
+function create_splitted(arr::Array{Float64,1}, T::Float64, fs::Int64)
+    N_t = time_to_discrete(T,fs)
+    Length = size(arr,1)
+    N = Int(floor(Length / N_t))
+    L_eq_arr = zeros((N,N_t))
+
+    # Split the 1D array into a 2D array that is cut off at the end to be a whole integer step from N_t
+    for i in 1:N
+      for j in 1:N_t
+        L_eq_arr[i,j] = arr[(i-1)*N_t + j]
+      end
+    end
+    return L_eq_arr
+  end
+
+  """
+function create_arrays(data::Array{Float64,1}, fs::Float64, T::Float64)
+
+    # Determine the length of the output arrays
+    len = floor(Int, T * length(data))
+
+    # Pad the input array with zeros
+    array1 = vcat(data, zeros(T * length(data) - length(data)))
+
+    # Remove some of the last values from the input array
+    array2 = data[1:(len-1)]
+
+    return (array1, array2)
+end
+"""
+
+function linspace(start::Number, stop::Number, n::Integer)
+    step = (stop - start) / (n - 1)
+    return range(start, stop=stop, length=n)
+end
+
+function Leq_fast(arr::Array{Float64,1}, fs::Int64)
+    N = time_to_discrete(0.015, fs)
+    arr1 = create_splitted(arr, 0.015, fs)
+    it = size(arr,1) ÷ N
+    l_eq = []
+    println(size(arr1))
+
+
+    # Creates the new L_eq array that contains pressure data for the given timefactor : fast = 0.125 s
+    for i in 1:size(arr1,1)
+        sum = 0
+        for j in 1:size(arr1,2)
+            sum += (arr1[i,j] / po)^2
+        end
+        push!(l_eq, 10*log(10,sum / size(arr1,2))) 
+
+    end
+    # Create the timestep values to be used when plotting the L_eq values with real time scale.
+    time = linspace(0, size(arr,1) / fs, it)
+
+    println("Calculated Leq")
+
+    return l_eq, time
+end
+
+
+
+
+
+
+function get_t30_db_plot(A,time)
+    # Convert decibel values to pressure values
+    p = 10 .^ (A / 20)
+
+    # Calculate the power of the pressure data
+    power = p .^ 2
+
+    # Find the index where the power starts to drop
+    peak_index = argmax(power)
+    drop_index = findfirst(x -> x < power[peak_index]/2, power[peak_index:end])
+    if isempty(drop_index)
+        error("Could not detect drop in sound power.")
+    end
+    t0 = drop_index + peak_index - 3
+
+    # Find the indices where the pressure has dropped by 5 dB and 35 dB
+    p5_index = findfirst(x -> x < A[t0] - 5, A[t0:end])
+    p35_index = findfirst(x -> x < A[t0] - 35, A[t0:end])
+    if isempty(p5_index) || isempty(p35_index)
+        error("Could not find points where pressure has dropped by 5 dB or 35 dB.")
+    end
+    t5 = p5_index + t0 - 1
+    t35 = p35_index + t0 - 1
+
+    println("t5: ", t5)
+    println("t35: ", t35)
+
+    # Calculate the slope and intercept of the regression line
+    x = time[t5:t35]
+    y = A[t5:t35]
+    n = length(x)
+    sx = sum(x)
+    sy = sum(y)
+    sxy = sum(x .* y)
+    sx2 = sum(x .^ 2)
+    m = (n * sxy - sx * sy) / (n * sx2 - sx^2)
+    b = (sy - m * sx) / n
+
+    println("m: ",m,"\t b: ",b)
+
+    # Calculate the decay rate of the sound over time
+    # from the slope of the regression line.
+    decay_rate = -20 * m
+
+    # Calculate T30 from the decay rate
+    #t30 = 30 / decay_rate
+    t30 = time[t35] - time[t5]
+    
+    println("RT: ",t30*2)
+
+    # Plot the pressure values and the regression line
+    p1 = plot(time, A, label="Pressure (dB)", grid=true, title="Pressure plot", xlabel="Time [s]", ylabel="Pressure [dB]")
+    p2 = plot!(x, m*x .+ b, label="Regression line, T30")
+    p3 = hline!([A[t5], A[t35]], linestyle=:dash, label="Regression bounds, T30")
+    
+    return t30, p1, p2, p3
+end
+
+
+
+function time_weighted_sound_level_t(pressure_data::Array{Float64}, reference_pressure::Float64)
+    # Set up constants according to IEC 61672-1
+    t1 = 0.125  # Time constant for fast weighting (s)
+    t2 = 1.0    # Time constant for slow weighting (s)
+    k = 1.0     # Factor for combining fast and slow weightings
+
+    # Initialize variables
+    Lp_fast = zeros(length(pressure_data))
+    Lp_slow = zeros(length(pressure_data))
+    Lp_time_weighted = zeros(length(pressure_data))
+
+    # Calculate sound pressure level for each sample using fast weighting
+    for i in 1:length(pressure_data)
+        Lp_fast[i] = 20 * log10(abs(pressure_data[i]) / reference_pressure) + 2.0
+    end
+
+    # Calculate sound pressure level for each sample using slow weighting
+    for i in 1:length(pressure_data)
+        if i == 1
+            Lp_slow[i] = Lp_fast[i]
+        else
+            Lp_slow[i] = k * Lp_slow[i-1] + (1-k) * Lp_fast[i]
+        end
+    end
+
+    # Calculate time-weighted sound level using the calculated sound pressure levels
+    for i in 1:length(pressure_data)
+        Lp_time_weighted[i] = 20 * log10(sqrt(sum(pressure_data[1:i].^2)/i) / reference_pressure)
+    end
+
+    return Lp_time_weighted
+end
+
+
+
+
+
+
 function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Array{Float64,3}, SE::Array{Float64,3}, SS::Array{Float64,3}, SW::Array{Float64,3}, SU::Array{Float64,3}, SD::Array{Float64,3},PN::Array{Float64,3}, PE::Array{Float64,3}, PS::Array{Float64,3}, PW::Array{Float64,3}, PU::Array{Float64,3}, PD::Array{Float64,3})
     Δt = (Δd / c)
+    println("Sampling frequency fs: ", 1 / Δt)
     N = T ÷ Δt
+    println("The tot iteration number is: ",N)
     p_node = [10, 10, 10]
-    p_arr = zeros(Int(N))
+    p_arr = Float64[]
 
     # Step 1 - Insert energy into grid
-        
-    # Use the global boolean parameter impulse if the initial scattering matrix will have an impulse signal
-    if impulse
-        i = imp_pos[1]
-        j = imp_pos[2]
-        k = imp_pos[3]
-        SN[i,j,k] = imp_val_p
-        SE[i,j,k] = imp_val_p
-        SS[i,j,k] = imp_val_p
-        SW[i,j,k] = imp_val_p
-        SU[i,j,k] = imp_val_p
-        SD[i,j,k] = imp_val_p
-    end
-
-    # Use the global boolean parameter harmonic if the grid should experience a harmonic time signal - Will work as a point source located at a single node 
-    if harmonic
-        i = harm_pos[1]
-        j = harm_pos[2]
-        k = harm_pos[3]
-        SN[i,j,k] = pressure_value(n*Δt)
-        SE[i,j,k] = pressure_value(n*Δt)
-        SS[i,j,k] = pressure_value(n*Δt)
-        SW[i,j,k] = pressure_value(n*Δt)
-        SU[i,j,k] = pressure_value(n*Δt)
-        SD[i,j,k] = pressure_value(n*Δt)
-    end
-
-    # Use the global boolean parameter harmonic_directional if the grid should experience a harmoncic time signal in only one direction / Weaker in some directions - Will be more general in the future.
-    if harmonic_directional
-        i = harm_pos[1]
-        j = harm_pos[2]
-        k = harm_pos[3]
-        SN[i,j,k] = pressure_value_directional(n*Δt)[1]
-        SE[i,j,k] = pressure_value_directional(n*Δt)[2]
-        SS[i,j,k] = pressure_value_directional(n*Δt)[3]
-        SW[i,j,k] = pressure_value_directional(n*Δt)[4]
-        SU[i,j,k] = pressure_value_directional(n*Δt)[5]
-        SD[i,j,k] = pressure_value_directional(n*Δt)[6]
-    end
-
+    
+    # Iterate through the matrix with timesteps "n" for a given total time "T"
     for n in 1:N
-        # Iterate through the matrix with timesteps "n" for a given total time "T"
+        # Step 1 - Insert energy into grid
+        
+        # Use the global boolean parameter impulse if the initial scattering matrix will have an impulse signal
+        if impulse == true && n == 1
+            println("Inserting Impulse")
+            i = imp_pos[1]
+            j = imp_pos[2]
+            k = imp_pos[3]
+            PN[i,j,k] = imp_val_p
+            #PE[i,j,k] = imp_val_p*10000
+            #PS[i,j,k] = imp_val_p*1000
+            #PW[i,j,k] = imp_val_p*1000
+            #PU[i,j,k] = imp_val_p*10000
+            #PD[i,j,k] = imp_val_p*1
+        end
+
+         # Use the global boolean parameter harmonic if the grid should experience a harmonic time signal - Will work as a point source located at a single node 
+        if harmonic == true && n < 1200
+            if n == 1
+                println("Insert Harmonic signal")
+            end
+            i = harm_pos[1]
+            j = harm_pos[2]
+            k = harm_pos[3]
+            PN[i+1,j,k] = pressure_value(n*Δt)
+            PE[i,j-1,k] = pressure_value(n*Δt)
+            PS[i-1,j,k] = pressure_value(n*Δt)
+            PW[i,j+1,k] = pressure_value(n*Δt)
+            PU[i,j,k-1] = pressure_value(n*Δt)
+            PD[i,j,k+1] = pressure_value(n*Δt)
+        end
+
+        # Use the global boolean parameter harmonic_directional if the grid should experience a harmoncic time signal in only one direction / Weaker in some directions - Will be more general in the future.
+        if harmonic_directional == true
+            i = harm_pos[1]
+            j = harm_pos[2]
+            k = harm_pos[3]
+            PN[i,j,k] = pressure_value_directional(n*Δt)[1]
+            PE[i,j,k] = pressure_value_directional(n*Δt)[2]
+            PS[i,j,k] = pressure_value_directional(n*Δt)[3]
+            PW[i,j,k] = pressure_value_directional(n*Δt)[4]
+            PU[i,j,k] = pressure_value_directional(n*Δt)[5]
+            PD[i,j,k] = pressure_value_directional(n*Δt)[6]
+        end
         
         # Step 2 - Calculate overall pressure
         pressure_grid = overal_pressure(PN, PE, PS, PW, PU, PD)
-        p_arr[Int(n)] = pressure_grid[p_node[1],p_node[2],p_node[3]]
+        println("Step:\t",n)
+       #println(pressure_grid)
+        push!(p_arr, pressure_grid[15,14,14])
 
+        """
+        println("PN : ",PN)
+        println("PE : ",PE)
+        println("PS : ",PS)
+        println("PW : ",PW)
+        println("PU : ",PU)
+        println("PD : ",PD)
+        println("************************************")
+        println("SN : ",SN)
+        println("SE : ",SE)
+        println("SS : ",SS)
+        println("SW : ",SW)
+        println("SU : ",SU)
+        println("SD : ",SD)
 
+        #println("SE : ",SE)
+
+        #println("P_grid : ", pressure_grid)
+        """
 
         # Step 3 - Calculate the scattering matrix
         SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD = calculate_scattering_matrix(SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD)
 
         # Step 4 - Calculate the pressure matrix
         SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD = calculate_pressure_matrix(Labeled_tlm, SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD)
-
     end
 
     x = range(0, stop=(N-1)*Δt, step=Δt)
+    #println("Pressure array: ",p_arr)
+    println("Finished with propagation")
 
-    plot(x, p_arr, label="Pressure values at node k")
+    println("Calculating L_eq")
+    t1 = time_weighted_sound_level_t(p_arr, p0)
 
 
+    #l_eq, time = Leq_fast(p_arr,fs)
+
+    #println(p_arr)
+    println(x)
+    
+    #t30, p1, p2, p3 = get_t30_db_plot(l_eq,  time)
+
+    display(plot(x, t1))
 end
 
 
 
+Δd = c / fs
 
-#Labeled_tlm = TLM(1, 10, 10, 10)
+Labeled_tlm, pressure_grid, SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD = create_shoebox(Δd, 2.5, 3, 4.0)
 
-#IW = TLM(1, 4, 3, 3)
-
-x = [5.0,5.0]
-y = [3.4,6.2]
-z = [2.0,4.0]
-
-x2 = [0.65,0.94]
-y2 = [1.01,1.01]
-z2 = [0.19,0.32]
-
-Δd = 0.1
-
-
-Labeled_tlm, pressure_grid, SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD = create_shoebox(Δd, 5, 3, 3)
-
-#println(Labeled_tlm)
-
-
-iterate_grid(0.03, Δd, pressure_grid, SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD)
-
-
-
-
-#Labeled_tlm = place_wall(IWE, x2, y2, z2, Δd)
-#IWE3 = place_wall(IWE2, x2, y2, z2, Δd)
-
-
-
-
+iterate_grid(1.2, Δd, pressure_grid, SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD)
