@@ -1,6 +1,8 @@
 using LinearAlgebra
 using Plots
-
+using Statistics, StatsPlots
+using Polynomials
+using Printf
 
 
 """
@@ -13,6 +15,8 @@ Time weighted L_fast
 
 
 ####### GLOBAL PARAMETERS ########
+
+
 Temp = 291
 ρ_air = 1.225
 c = 343.2*sqrt(Temp/293)
@@ -25,12 +29,17 @@ harm_pos = [20,20,20]
 harmonic_directional = false
 freq = 100
 po = 2*10^(-5)
-A = 20
+A = 1
 fs = 3000
+R = [0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6]
 
-R = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
-##################################
+######################################
 
+
+
+function _real_to_index(val, Δd)
+    return Int(val * Δd)
+end
 
 function TLM(Δd, height, width, length)
     nx = length ÷ Δd
@@ -41,15 +50,14 @@ function TLM(Δd, height, width, length)
     return tlm
 end
 
-
-
 # Functioning code for creating a shoebox shaped room having labels for all nodes describing if its a fluid, 
 # surface, edge or corner. 
-function create_shoebox(Δd, height, width, length)
+function create_shoebox(Δd, length, width, height)
     
     nx = Int(length ÷ Δd + 1)
-    ny = Int(width ÷ Δd +1)
-    nz = Int(height ÷ Δd +1)
+    ny = Int(width ÷ Δd + 1)
+    nz = Int(height ÷ Δd + 1)
+
 
     println("Creating Shoebox shape")
     println("size:\t x_direction: ", nx*Δd, " m \t y_direction: ",ny*Δd," m \t z_direction: ", nz*Δd, " m")
@@ -418,7 +426,7 @@ end
 
 
 function overal_pressure(PN::Array{Float64,3}, PE::Array{Float64,3}, PS::Array{Float64,3}, PW::Array{Float64,3}, PU::Array{Float64,3}, PD::Array{Float64,3})
-    P_grid = (1/3) * (PW .+ PN .+ PE .+ PS .+ PU .+ PD)
+    P_grid = (1/3) .* (PW .+ PN .+ PE .+ PS .+ PU .+ PD)
     return P_grid
 end
 
@@ -490,6 +498,51 @@ end
 
 
 
+function find_t30(pressure::Vector{Float64}, time::Vector{Float64}, it::Int64, X::Float64, Y::Float64, Z::Float64)
+    # Find the start and end indices for the regression interval
+    start_index = it
+    end_index = length(pressure)
+    for i in it:length(pressure)
+        if pressure[i] <= pressure[it] - 5
+            start_index = i
+            break
+        end
+    end
+    for i in start_index:length(pressure)
+        if pressure[i] <= pressure[it] - 35
+            end_index = i
+            break
+        end
+    end
+
+    # Create arrays for the regression
+    x = time[start_index:end_index]
+    y = pressure[start_index:end_index]
+
+    # Calculate the regression coefficients
+    n = length(x)
+    x̄ = mean(x)
+    ȳ = mean(y)
+    Sxx = sum((x .- x̄) .^ 2)
+    Sxy = sum((x .- x̄) .* (y .- ȳ))
+    b₁ = Sxy / Sxx
+    b₀ = ȳ - b₁ * x̄
+
+    # Calculate the T20 value
+    t30 = -30 / b₁
+    @printf("T30 value: %.2f s\n", t30)
+    V = X * Y * Z
+    S = 2 * X * Y + 2 * X * Z + 2 * Y * Z
+
+    D_R = 0.16 * V / (S*(1-R[1]^2))
+    @printf("Sabines Equation: %.2f s\n", D_R)
+
+
+    # Plot the pressure values and regression line
+    plot(time, pressure, xlabel="Time (s)", ylabel="Pressure (dB)", label="Pressure")
+    plot!(x, b₀ .+ b₁ .* x, label="Regression Line")
+    hline!([pressure[start_index], pressure[end_index]], linestyle=:dash, label="Regression bounds, T20")
+end
 
 
 
@@ -510,17 +563,22 @@ function get_t30_db_plot(A,time)
 
     # Find the indices where the pressure has dropped by 5 dB and 35 dB
     p5_index = findfirst(x -> x < A[t0] - 5, A[t0:end])
+    p25_index = findfirst(x -> x < A[t0] - 25, A[t0:end])
     p35_index = findfirst(x -> x < A[t0] - 35, A[t0:end])
+
     if isempty(p5_index) || isempty(p35_index)
         error("Could not find points where pressure has dropped by 5 dB or 35 dB.")
     end
     t5 = p5_index + t0 - 1
     t35 = p35_index + t0 - 1
+    t25 = p25_index + t0 - 1
+
 
     println("t5: ", t5)
     println("t35: ", t35)
+    println("t25: ", t25)
 
-    # Calculate the slope and intercept of the regression line
+    # Calculate the slope and intercept of the regression line for T30
     x = time[t5:t35]
     y = A[t5:t35]
     n = length(x)
@@ -533,22 +591,43 @@ function get_t30_db_plot(A,time)
 
     println("m: ",m,"\t b: ",b)
 
+    # Calculate the slope and intercept of the regression line for T20
+    x_20 = time_20[t5:t25]
+    y_20 = A_20[t5:t25]
+    n_20 = length(x_20)
+    sx_20 = sum(x_20)
+    sy_20 = sum(y_20)
+    sxy_20 = sum(x_20 .* y_20)
+    sx2_20 = sum(x_20 .^ 2)
+    m_20 = (n_20 * sxy_20 - sx_20 * sy_20) / (n_20 * sx2_20 - sx_20^2)
+    b_20 = (sy_20 - m_20 * sx_20) / n_20
+
+    println("m: ",m_20,"\t b: ",b_20)
+
+
+
     # Calculate the decay rate of the sound over time
     # from the slope of the regression line.
-    decay_rate = -20 * m
+    decay_rate_T30 = -20 * m
+    decay_rate_T20 = -20 * m_20
+
 
     # Calculate T30 from the decay rate
     #t30 = 30 / decay_rate
     t30 = time[t35] - time[t5]
+    t20 = time_20[t25] - time_20[5]
     
-    println("RT: ",t30*2)
+
+    println("T30: ",t30*2)
+    println("T20: ", t20*3)
+
 
     # Plot the pressure values and the regression line
     p1 = plot(time, A, label="Pressure (dB)", grid=true, title="Pressure plot", xlabel="Time [s]", ylabel="Pressure [dB]")
-    p2 = plot!(x, m*x .+ b, label="Regression line, T30")
-    p3 = hline!([A[t5], A[t35]], linestyle=:dash, label="Regression bounds, T30")
-    
-    return t30, p1, p2, p3
+    p2 = plot!(x_20, m_20*x_20 .+ b_20, label="Regression line, T20")
+    p3 = hline!([A[t5], A[t25]], linestyle=:dash, label="Regression bounds, T20")
+
+    return t20, t30, p1, p2, p3
 end
 
 
@@ -588,7 +667,14 @@ end
 
 
 
+function _Lp(arr)
+    log10_arr = log10.(arr ./ po)
+    return 20 .* log10_arr
+end
 
+function _time_to_samples(time::Float64)
+    return Int(time*fs)
+end
 
 
 function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Array{Float64,3}, SE::Array{Float64,3}, SS::Array{Float64,3}, SW::Array{Float64,3}, SU::Array{Float64,3}, SD::Array{Float64,3},PN::Array{Float64,3}, PE::Array{Float64,3}, PS::Array{Float64,3}, PW::Array{Float64,3}, PU::Array{Float64,3}, PD::Array{Float64,3})
@@ -598,6 +684,10 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
     println("The tot iteration number is: ",N)
     p_node = [10, 10, 10]
     p_arr = Float64[]
+    L = size(pressure_grid,1)
+    M = size(pressure_grid,2)
+    N_length = size(pressure_grid,3)
+
 
     # Step 1 - Insert energy into grid
     
@@ -620,7 +710,7 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
         end
 
          # Use the global boolean parameter harmonic if the grid should experience a harmonic time signal - Will work as a point source located at a single node 
-        if harmonic == true && n < 1200
+        if harmonic == true && n < _time_to_samples(0.2)
             if n == 1
                 println("Insert Harmonic signal")
             end
@@ -651,8 +741,9 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
         # Step 2 - Calculate overall pressure
         pressure_grid = overal_pressure(PN, PE, PS, PW, PU, PD)
         println("Step:\t",n)
-       #println(pressure_grid)
-        push!(p_arr, pressure_grid[15,14,14])
+        #println(pressure_grid)
+        #push!(p_arr, pressure_grid[15,14,14])
+        push!(p_arr, sqrt((1/(L*M*N_length))*sum(pressure_grid.^2)))
 
         """
         println("PN : ",PN)
@@ -681,28 +772,30 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
         SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD = calculate_pressure_matrix(Labeled_tlm, SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD)
     end
 
-    x = range(0, stop=(N-1)*Δt, step=Δt)
+
+
+    
+    x = collect(range(0, stop=(N-1)*Δt, step=Δt))
+    
     #println("Pressure array: ",p_arr)
     println("Finished with propagation")
 
+
+    p_arr = _Lp(p_arr)
     println("Calculating L_eq")
-    t1 = time_weighted_sound_level_t(p_arr, p0)
 
-
-    #l_eq, time = Leq_fast(p_arr,fs)
-
-    #println(p_arr)
-    println(x)
-    
-    #t30, p1, p2, p3 = get_t30_db_plot(l_eq,  time)
-
-    display(plot(x, t1))
+    find_t30(p_arr, x, _time_to_samples(0.2)-10, L*Δd, M*Δd, N_length*Δd)
 end
+
+
 
 
 
 Δd = c / fs
 
-Labeled_tlm, pressure_grid, SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD = create_shoebox(Δd, 2.5, 3, 4.0)
+Labeled_tlm, pressure_grid, SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD = create_shoebox(Δd, 4.0, 3, 2.5)
 
-iterate_grid(1.2, Δd, pressure_grid, SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD)
+iterate_grid(0.8, Δd, pressure_grid, SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD)
+
+
+

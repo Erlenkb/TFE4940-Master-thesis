@@ -4,12 +4,25 @@ import numpy as np
 
 ####### Parameterverdier ######
 tykkelse_kryssfiner = 0.02
-f_0Box = 280
-f_nedregrense = 200
+tykkelse_absorbent_bunn_15mm = 0.015
+tykkelse_absorbent_bunn_20mm = 0.02
+f_0Box = 400
+f_nedregrense = 250
 f_øvregrense = 10000
-N = 17
+N = 7
+b_box = 0.30
+d_box = 0.25
+
+
 
 ##############################
+
+
+### Dybde =< 25 cm
+### Bredde =< 30 cm
+
+
+
 SMALL_SIZE = 12
 MEDIUM_SIZE = 14
 BIGGER_SIZE = 16
@@ -21,6 +34,19 @@ plt.rc('xtick', labelsize=MEDIUM_SIZE)
 plt.rc('ytick', labelsize=SMALL_SIZE)
 plt.rc('legend', fontsize=SMALL_SIZE)
 plt.rc('figure', titlesize=BIGGER_SIZE)
+
+#######################################
+
+def _frekvens_av_dybde_MLS(d):
+    f_0 = 86 / d
+    f_øvre = 1.4 * f_0
+    f_nedre = 0.7 * f_0
+    return f_nedre, f_0, f_øvre
+
+
+
+
+
 
 
 
@@ -81,31 +107,16 @@ def _QRD_øvre_frekvens(b_QRD):
     print("Øvre grensefrekvens for en QRD med bredde ",b_QRD," m er ",round(573 / b_QRD,1)," Hz")
     return 573 / b_QRD
 
-
-
-print("#################################################################\n")
-d, b, l = _parametere_frekvens(f_0Box, f_nedregrense, f_øvregrense)
-d_maks, b_QRD = _parametere_QRD(d, tykkelse_kryssfiner, b, tykkelse_kryssfiner, N)
-_elementnummer_dybde_og_f_0(N, d_maks)
-_QRD_depth_calc(N, 400)
-_QRD_width_check(N, b_QRD)
-_QRD_øvre_frekvens(b_QRD)
-
-print("\n#################################################################")
-
-
-
 def _plot_Box_shape_template(b,d_maks,b_QRD,N,tykkelse_kant=tykkelse_kryssfiner, tykkelse_bunn=tykkelse_kryssfiner):
     n = []
     n_cm = []
     for m in range(N*2):
         n.append(m**2 % N)
     
-    print(n_cm)
     n_maks = max(n)
     for i in n: n_cm.append(i*(d_maks / n_maks))
     n_cm = n_cm[(N+1)//2:N+N//2+2]
-    print(n_cm)
+    
     x_steps = np.linspace(tykkelse_kant, tykkelse_kant+((N)*b_QRD), N+1)
 
     for i,val in enumerate(n_cm): n_cm[i] = d_maks - val
@@ -122,29 +133,156 @@ def _plot_Box_shape_template(b,d_maks,b_QRD,N,tykkelse_kant=tykkelse_kryssfiner,
     
     ax.grid()
     ax.legend()
-    ax.set_xlim(-b_QRD,b+b_QRD)
-    ax.set_ylim(-b_QRD, b+b_QRD)
+    ax.set_xlim(-1.2*tykkelse_kant, 0.2*tykkelse_kant+2*tykkelse_kant+N*b_QRD)
+    ax.set_ylim(-1.2*tykkelse_kant, 0.2*tykkelse_kant+2*tykkelse_kant+N*b_QRD)
     ax.set_title("Snitt av QRD del for diffusjonsbokser med N={0}".format(N))
-    ax.set_ylabel("dybde [m]")
+    ax.set_ylabel("Dybde [m]")
     ax.set_xlabel("Bredde [m]")
-    
-    
-    
-    #print(x_steps)
-    #print(n)
-    
-    
     plt.show()
    
+    return 1
+
+
+def _print_frequency_with_QRD(d_box, b_box, tykkelse_absorbent):
+    
+    ##### Boks parametere
+    box_f_nedre, box_f_0, box_f_øvre = _frekvens_av_dybde_MLS(d_box)
+    
+    ##### QRD parametere
+    N_test = [7,11,13,17,21]
+    n_maks = np.zeros(len(N_test))
+    f_0_QRD = np.zeros(len(N_test))
+    n = np.zeros(len(N_test))
+    d_QRD_maks = np.zeros(len(N_test))
+    b_QRD = np.zeros(len(N_test))
+    QRD_f_nedre_verifisering = np.zeros(len(N_test))
+    QRD_f_nedre = np.zeros(len(N_test))
+    QRD_f_øvre = np.zeros(len(N_test))
+    tykkelse_bunn = tykkelse_kryssfiner + tykkelse_absorbent
+    for i, val in enumerate(N_test):
+        
+        d_QRD_maks[i], b_QRD[i] = _parametere_QRD(d_box, tykkelse_bunn, b_box, tykkelse_kryssfiner, val)
+        n_maks[i], f_0_QRD[i], n = _elementnummer_dybde_og_f_0(val,d_QRD_maks[i])
+        QRD_f_nedre_verifisering[i] = 344 / (val * b_QRD[i])
+        QRD_f_nedre[i] = 0.5 * f_0_QRD[i]
+        QRD_f_øvre[i] = 573 / b_QRD[i]
+
+
+    n = []
+    n_cm = []
+    for m in range(N*2):
+        n.append(m**2 % N)
+    
+    n_maks = max(n)
+    for i in n: n_cm.append(i*(d_QRD_maks[0] / n_maks))
+    n_cm = n_cm[(N+1)//2:N+N//2+2]
+    
+    x_steps = np.linspace(tykkelse_kryssfiner, tykkelse_kryssfiner+((N)*b_QRD[0]), N+1)
+
+    for i,val in enumerate(n_cm): n_cm[i] = d_QRD_maks[0] - val
+
+
+
+
+
+
+
+
+    #### Plot parametere
+    N_x_values = []
+    N_y_values = []
+    y_ticks = [0]
+    y_ticks_label = ["Box"]
+    x_ticks_third_octave = [100, 200, 500, 1000, 2000, 5000, 10000, 20000, 40000]
+    x_ticks_third_octave_labels = ["100", "200", "500", "1k", "2k", "5k","10k","20k","40k"]
+
+    print("f_nedre 0.5*f_0\t\t f_nedre 344/(N*b)\t\t f_øvre 573/b")
+    for i in range(len(N_test)):
+        print(round(QRD_f_nedre[i],1)," Hz\t\t",round(QRD_f_nedre_verifisering[i],1)," Hz\t\t\t",round(QRD_f_øvre[i],1)," Hz")
+        N_x_values.append([QRD_f_nedre[i],QRD_f_øvre[i]])
+        N_y_values.append([i+1,i+1])
+        y_ticks.append(i+1)
+        y_ticks_label.append("N={0}".format(N_test[i]))
+    
+    fig = plt.figure(figsize=(7,10))
+    plt.style.use("ggplot")
+    ax = fig.add_subplot(211)
+    ax1 = fig.add_subplot(212)
+    
+    #### Frequency plot
+    for i in range(len(N_test)):
+        ax.plot(N_x_values[i],N_y_values[i],label="N={0}".format(N_test[i]),linewidth=5)
+    ax.plot([box_f_nedre,box_f_øvre],[0,0],label="Box",linewidth=5)
+    ax.set_xticks(x_ticks_third_octave)
+    ax.set_xticklabels(x_ticks_third_octave_labels)     
+    ax.set_yticks(y_ticks)
+    ax.set_yticklabels(y_ticks_label)
+       
+    ax.grid(which="major", color="dimgray")
+    ax.grid(which="minor", linestyle=":", color="dimgray")
+    ax.set_xlabel("Frequency [Hz]")
+    # ax.set_ylabel("D")
+    ax.set_xscale("log")
     
     
-    #ax.hlines()
+    #### Diffusor template
+    ax1.step(x_steps, n_cm, where="post", label="Spalter som utgjør QRD delen inne i boksen")
+    ax1.vlines([0,tykkelse_kryssfiner,tykkelse_kryssfiner+N*b_QRD[0],2*tykkelse_kryssfiner+N*b_QRD[0]],0,d_QRD_maks[0],colors="black")
+    ax1.hlines([d_QRD_maks[0],d_QRD_maks[0]],[0,tykkelse_kryssfiner+N*b_QRD[0]],[tykkelse_kryssfiner,2*tykkelse_kryssfiner+N*b_QRD[0]],colors="black")
+    ax1.vlines([0, 2*tykkelse_kryssfiner+N*b_QRD[0]],0,-tykkelse_bunn,colors="black")
+    ax1.hlines([0,-tykkelse_bunn],0,2*tykkelse_kryssfiner+N*b_QRD[0],colors="black",label="Snitt av boks - kryssfiner")
+    
+    ax1.grid()
+    ax1.legend()
+    ax1.set_xlim(-1.2*tykkelse_kryssfiner, 0.2*tykkelse_kryssfiner+2*tykkelse_kryssfiner+N*b_QRD[0])
+    ax1.set_ylim(-1.2*tykkelse_kryssfiner, 0.2*tykkelse_kryssfiner+2*tykkelse_kryssfiner+N*b_QRD[0])
+    ax1.set_title("Snitt av QRD del for diffusjonsbokser med N={0}".format(N))
+    ax1.set_ylabel("Dybde [m]")
+    ax1.set_xlabel("Bredde [m]")
+    plt.show()
+    
+    
+    
+    
+    
+    plt.legend()
+    plt.show()
     
     
     return 1
 
 
-_plot_Box_shape_template(b,d_maks,b_QRD,N)
+_print_frequency_with_QRD(d_box, b_box, tykkelse_absorbent_bunn_15mm)
 
-print(8//2)
+
+
+
+
+##### Run Main code from here #####
+
+if __name__ == "__main__":
+    
+    
+    
+    
+    
+    
+    
+    
+    print("#################################################################\n")
+    d, b, l = _parametere_frekvens(f_0Box, f_nedregrense, f_øvregrense)
+    d_maks, b_QRD = _parametere_QRD(d, tykkelse_kryssfiner, b, tykkelse_kryssfiner, N)
+    _elementnummer_dybde_og_f_0(N, d_maks)
+    _QRD_depth_calc(N, 400)
+    _QRD_width_check(N, b_QRD)
+    _QRD_øvre_frekvens(b_QRD)
+    _plot_Box_shape_template(b,d_maks,b_QRD,N)
+    print("\n#################################################################")
+   
+
+
+
+
+
+
 
