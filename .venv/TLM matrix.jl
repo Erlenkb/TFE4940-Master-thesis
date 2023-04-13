@@ -32,7 +32,6 @@ po = 2*10^(-5)
 A = 1
 fs = 3000
 R = [0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6]
-
 ######################################
 
 
@@ -64,13 +63,6 @@ function create_shoebox(Δd, length, width, height)
 
     box = zeros(Int, (nx,ny,nz))
 
-    A = []
-
-    B = A
-    C = A
-    D = A
-
-    
     SN = zeros((nx,ny,nz))
     SE = zeros((nx,ny,nz))
     SS = zeros((nx,ny,nz))
@@ -84,9 +76,7 @@ function create_shoebox(Δd, length, width, height)
     PU = zeros((nx,ny,nz))
     PD = zeros((nx,ny,nz))
 
-
     pressure_grid = zeros((nx,ny,nz))
-
 
     # Set surface values by checking the position
     for i in 1:nx
