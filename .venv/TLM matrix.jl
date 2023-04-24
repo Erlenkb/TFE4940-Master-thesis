@@ -1,9 +1,30 @@
+
+using Plots
+using Printf
+using Statistics, StatsPlots
+using Polynomials
+using ControlSystems
+"""
 using LinearAlgebra
 using Plots
 using Statistics, StatsPlots
 using Polynomials
 using Printf
+using PlotlyJS
+"""
 
+"""
+using GLM --> Look into that
+
+plot source and then 1m
+
+Oria - NTNU bibliotek
+
+27.april next meeting
+"""
+
+include("Draw_box_closed.jl")
+include("ltau.jl")
 
 """
 GMSH - Tool for Julia - Mesh generator
@@ -15,8 +36,6 @@ Time weighted L_fast
 
 
 ####### GLOBAL PARAMETERS ########
-
-
 Temp = 291
 ρ_air = 1.225
 c = 343.2*sqrt(Temp/293)
@@ -25,19 +44,32 @@ impulse = false
 imp_pos = [20,20,20]
 imp_val_p = 10
 harmonic = true
-harm_pos = [20,20,20]
+harm_pos = [2.0,0.75,1.2]
 harmonic_directional = false
-freq = 100
+freq = 400
 po = 2*10^(-5)
-A = 1
+p0 = 2*10^(-5)
+A = 100
 fs = 3000
-R = [0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6]
+R = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
 ######################################
 
+####### Box parameters ###############
+d_box = 1.2
+b_box = 0.7
+h_box = 1.8
+N_QRD = 7
+b_QRD = 0.039
+d_max_QRD = 0.1
+d_vegger = 0.07
+d_bakplate = 0.07
+d_skilleplate = 0.06
+d_absorbent_QRD = 0.1
+#######################################
 
-
-function _real_to_index(val, Δd)
-    return Int(val * Δd)
+function _real_to_index(val::Array{Float64,1}, Δd)
+    ind = [Int(div(val[1],Δd)), Int(div(val[2],Δd)), Int(div(val[3],Δd))]
+    return ind
 end
 
 function TLM(Δd, height, width, length)
@@ -59,6 +91,7 @@ function create_shoebox(Δd, length, width, height)
 
 
     println("Creating Shoebox shape")
+    println("Δd: ",Δd, " m")
     println("size:\t x_direction: ", nx*Δd, " m \t y_direction: ",ny*Δd," m \t z_direction: ", nz*Δd, " m")
 
     box = zeros(Int, (nx,ny,nz))
@@ -234,7 +267,7 @@ function merges(A::Int64, B::Int64)::Int64
 end
 
 
-function merge(A::Float64, B::Float64)
+function merge(A::Int64, B::Float64)
     # Convert A and B to integers
     int_A = round(Int, A)
     int_B = round(Int, B)
@@ -254,9 +287,7 @@ end
 
 
 
-function place_wall(arr::Array{Float64, 3}, x_pos::Array{Float64, 1}, y_pos::Array{Float64, 1}, z_pos::Array{Float64, 1}, Δd::Float64)
-    
-    
+function place_wall(arr::Array{Int64, 3}, x_pos::Array{Float64, 1}, y_pos::Array{Float64, 1}, z_pos::Array{Float64, 1}, Δd::Float64)
 
     if x_pos[1]==x_pos[2]
         println("X pos is plane")
@@ -407,7 +438,7 @@ end
 """
 
 function pressure_value(t::Float64)
-    return round(A*sin(t*2*pi*freq);digits=4)
+    return A*sin(t*2*pi*freq)
 end
 
 function pressure_value_directional(t::Float64)
@@ -440,21 +471,7 @@ function create_splitted(arr::Array{Float64,1}, T::Float64, fs::Int64)
     return L_eq_arr
   end
 
-  """
-function create_arrays(data::Array{Float64,1}, fs::Float64, T::Float64)
 
-    # Determine the length of the output arrays
-    len = floor(Int, T * length(data))
-
-    # Pad the input array with zeros
-    array1 = vcat(data, zeros(T * length(data) - length(data)))
-
-    # Remove some of the last values from the input array
-    array2 = data[1:(len-1)]
-
-    return (array1, array2)
-end
-"""
 
 function linspace(start::Number, stop::Number, n::Integer)
     step = (stop - start) / (n - 1)
@@ -533,6 +550,7 @@ function find_t30(pressure::Vector{Float64}, time::Vector{Float64}, it::Int64, X
     plot!(x, b₀ .+ b₁ .* x, label="Regression Line")
     hline!([pressure[start_index], pressure[end_index]], linestyle=:dash, label="Regression bounds, T20")
 end
+
 
 
 
@@ -622,37 +640,17 @@ end
 
 
 
-function time_weighted_sound_level_t(pressure_data::Array{Float64}, reference_pressure::Float64)
-    # Set up constants according to IEC 61672-1
-    t1 = 0.125  # Time constant for fast weighting (s)
-    t2 = 1.0    # Time constant for slow weighting (s)
-    k = 1.0     # Factor for combining fast and slow weightings
 
-    # Initialize variables
-    Lp_fast = zeros(length(pressure_data))
-    Lp_slow = zeros(length(pressure_data))
-    Lp_time_weighted = zeros(length(pressure_data))
-
-    # Calculate sound pressure level for each sample using fast weighting
-    for i in 1:length(pressure_data)
-        Lp_fast[i] = 20 * log10(abs(pressure_data[i]) / reference_pressure) + 2.0
-    end
-
-    # Calculate sound pressure level for each sample using slow weighting
-    for i in 1:length(pressure_data)
-        if i == 1
-            Lp_slow[i] = Lp_fast[i]
-        else
-            Lp_slow[i] = k * Lp_slow[i-1] + (1-k) * Lp_fast[i]
-        end
-    end
-
-    # Calculate time-weighted sound level using the calculated sound pressure levels
-    for i in 1:length(pressure_data)
-        Lp_time_weighted[i] = 20 * log10(sqrt(sum(pressure_data[1:i].^2)/i) / reference_pressure)
-    end
-
-    return Lp_time_weighted
+function plot_arrays(arr1::Array, arr2::Array, arr3::Array, fs::Int64)
+    t = collect(0:length(arr1)-1) / fs
+    plot(t, arr1, label="Mic @source (dB)")
+    plot!(t, arr2, label="Mic 1 m from source (dB)")
+    plot!(t, arr3, label="Mic 2 m from source (dB)")
+    xlabel!("Time (s)")
+    ylabel!("Magnitude (dB)")
+    title!("Time weighted sound pressure \nlevel at three positions")
+    ylims!((0,100))
+    savefig("Pressure drop.png")
 end
 
 
@@ -678,6 +676,14 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
     M = size(pressure_grid,2)
     N_length = size(pressure_grid,3)
 
+    meas_pos1 = []
+    meas_pos2 = []
+    meas_pos3 = []
+    ind2 = _real_to_index([2.0,0.75,1.2], Δd)
+    ind1 = _real_to_index([2.0,1.75,1.2], Δd)
+    ind3 = _real_to_index([2.0,2.5,1.2], Δd)
+    println(ind1)
+    println(ind2)
 
     # Step 1 - Insert energy into grid
     
@@ -704,15 +710,16 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
             if n == 1
                 println("Insert Harmonic signal")
             end
-            i = harm_pos[1]
-            j = harm_pos[2]
-            k = harm_pos[3]
-            PN[i+1,j,k] = pressure_value(n*Δt)
-            PE[i,j-1,k] = pressure_value(n*Δt)
-            PS[i-1,j,k] = pressure_value(n*Δt)
-            PW[i,j+1,k] = pressure_value(n*Δt)
-            PU[i,j,k-1] = pressure_value(n*Δt)
-            PD[i,j,k+1] = pressure_value(n*Δt)
+
+            i = _real_to_index(harm_pos,Δd)[1]
+            j = _real_to_index(harm_pos,Δd)[2]
+            k = _real_to_index(harm_pos,Δd)[3]
+            PN[i,j,k] = pressure_value(n*Δt)
+            PE[i,j,k] = pressure_value(n*Δt)
+            PS[i,j,k] = pressure_value(n*Δt)
+            PW[i,j,k] = pressure_value(n*Δt)
+            PU[i,j,k] = pressure_value(n*Δt)
+            PD[i,j,k] = pressure_value(n*Δt)
         end
 
         # Use the global boolean parameter harmonic_directional if the grid should experience a harmoncic time signal in only one direction / Weaker in some directions - Will be more general in the future.
@@ -733,6 +740,18 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
         println("Step:\t",n)
         #println(pressure_grid)
         #push!(p_arr, pressure_grid[15,14,14])
+
+
+
+        
+
+        meas1 = pressure_grid[ind1[1],ind1[2],ind1[3]]
+        meas2 = pressure_grid[ind2[1],ind2[2],ind2[3]]
+        meas3 = pressure_grid[ind3[1],ind3[2],ind3[3]]
+
+        push!(meas_pos1, meas1)
+        push!(meas_pos2, meas2)
+        push!(meas_pos3, meas3)
         push!(p_arr, sqrt((1/(L*M*N_length))*sum(pressure_grid.^2)))
 
         """
@@ -767,15 +786,56 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
     
     x = collect(range(0, stop=(N-1)*Δt, step=Δt))
     
+    
+
+    p1 = ltau(meas_pos1, fs, 0.0125, p0)
+    p1_2 = ltau(meas_pos2, fs, 0.0125, p0)
+    p1_3 = ltau(meas_pos3, fs, 0.0125, p0)
+
+    
+    
+
     #println("Pressure array: ",p_arr)
     println("Finished with propagation")
 
 
-    p_arr = _Lp(p_arr)
-    println("Calculating L_eq")
+    #p_arr = _Lp(p_arr)
+    #println("Calculating L_eq")
 
-    find_t30(p_arr, x, _time_to_samples(0.2)-10, L*Δd, M*Δd, N_length*Δd)
+    find_t30(p1_3, x, _time_to_samples(0.2)-10, L*Δd, M*Δd, N_length*Δd)
+    #plot_arrays(p1, p1_2, p1_3, fs)
 end
+
+
+function plot_heatmap(data)
+    # Create a mask to replace 0 values with NaNs
+    
+    mask = ones(size(data))
+    mask[data .== 0] .= NaN
+
+    # Create the heatmap
+    heatmap(data.* mask, color = :grays, clims=(0, 99999999))
+end
+
+
+
+
+
+
+function plot_binary_heatmap_3d(data::Array{Int, 3})
+    binary_data = map(x -> x == 0 ? 0 : 1, data)
+    nx, ny, nz = size(binary_data)
+    x = repeat(1:nx, inner=(ny,nz))
+    y = repeat(1:ny, outer=(nx,nz))
+    z = repeat(1:nz, inner=(nx,ny))
+    v = permutedims(binary_data, [3, 2, 1])
+    
+    heatmap(x, y, z, v, color=:grays, colorbar=false, camera=(50, 30), xlabel="x", ylabel="y", zlabel="z")
+end
+
+
+
+
 
 
 
@@ -783,7 +843,21 @@ end
 
 Δd = c / fs
 
-Labeled_tlm, pressure_grid, SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD = create_shoebox(Δd, 4.0, 3, 2.5)
+Labeled_tlm, pressure_grid, SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD = create_shoebox(Δd, 4.0, 3.0, 2.5)
+
+boxshape = draw_box_closed([3.5, 0.5, 0.2], 2, d_box, b_box, h_box, N_QRD, b_QRD, d_max_QRD, d_vegger, d_bakplate, d_skilleplate, d_absorbent_QRD)
+
+
+
+"""
+for (i,plane) in enumerate(boxshape)
+   
+    println("w",i, "\t", plane)
+    place_wall(Labeled_tlm, plane[1], plane[2], plane[3], Δd)
+end
+
+plot_heatmap(Labeled_tlm[:,:,100])
+"""
 
 iterate_grid(0.8, Δd, pressure_grid, SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD)
 

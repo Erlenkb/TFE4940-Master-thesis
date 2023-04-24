@@ -3,14 +3,14 @@ import numpy as np
 
 
 ####### Parameterverdier ######
-tykkelse_kryssfiner = 0.02
+tykkelse_kryssfiner = 0.015
 tykkelse_absorbent_bunn_15mm = 0.015
 tykkelse_absorbent_bunn_20mm = 0.02
 f_0Box = 400
 f_nedregrense = 250
 f_øvregrense = 10000
-N = 13
-N_it = 2
+N = 7
+N_it = 0
 b_box = 0.30
 d_box = 0.25
 
@@ -188,24 +188,17 @@ def _print_frequency_with_QRD(d_box, b_box, tykkelse_absorbent):
         QRD_f_nedre_1[i] = 0.5 * f_0_QRD_1[i]
         QRD_f_øvre_1[i] = 573 / b_QRD_1[i]
 
-
     n_1 = []
     n_cm_1 = []
     for m in range(N*2):
         n_1.append(m**2 % N)
-
+        
     n_maks_1 = max(n_1)
     for i in n_1: n_cm_1.append(i*(d_QRD_maks_1[0] / n_maks_1))
     n_cm_1 = n_cm_1[(N+1)//2:N+N//2+2]
 
     x_steps_1 = np.linspace(tykkelse_kryssfiner, tykkelse_kryssfiner+((N)*b_QRD[N_it]), N+1)
-
     for i,val in enumerate(n_cm_1): n_cm_1[i] = d_QRD_maks_1[0] - val
-
-
-
-
-
 
     #### Plot parametere
     N_x_values = []
@@ -232,15 +225,16 @@ def _print_frequency_with_QRD(d_box, b_box, tykkelse_absorbent):
     x_ticks_third_octave_labels_1 = ["100", "200", "500", "1k", "2k", "5k","10k","20k","40k"]
 
     print("######## Tykkelse aborbent: {0} mm".format(tykkelse_absorbent_bunn_20mm*100))
-    print("f_nedre 0.5*f_0\t\t f_nedre 344/(N*b)\t\t f_øvre 573/b")
+    print("N\t\t f_nedre 0.5*f_0\t\t f_nedre 344/(N*b)\t\t f_øvre 573/b")
     for i in range(len(N_test)):
-        print(round(QRD_f_nedre_1[i],1)," Hz\t\t",round(QRD_f_nedre_verifisering_1[i],1)," Hz\t\t\t",round(QRD_f_øvre_1[i],1)," Hz")
+        #print(round(QRD_f_nedre_1[i],1)," Hz\t\t",round(QRD_f_nedre_verifisering_1[i],1)," Hz\t\t\t",round(QRD_f_øvre_1[i],1)," Hz \t\t")
+        print("{0}\t\t{1:.1f} Hz \t\t {2:.1f} Hz\t\t {3:.1f}".format(N_test[i],QRD_f_nedre[i],QRD_f_nedre_verifisering[i],QRD_f_øvre[i]))
         N_x_values_1.append([QRD_f_nedre_1[i],QRD_f_øvre_1[i]])
         N_y_values_1.append([i+1,i+1])
         y_ticks_1.append(i+1)
         y_ticks_label_1.append("N={0}".format(N_test[i]))
 
-    
+
     fig = plt.figure(figsize=(10,10))
     plt.style.use("ggplot")
     ax = fig.add_subplot(221)
@@ -322,7 +316,9 @@ def _print_frequency_with_QRD(d_box, b_box, tykkelse_absorbent):
     ax1_2.set_xlabel("Bredde [m]")
 
     #plt.legend()
-    plt.show()
+    fig.savefig("Mal for boks med gitte frekvensspektrum for ulike verdier av N.png")
+    #plt.show()
+    plt.close()
     
     
     return 1
