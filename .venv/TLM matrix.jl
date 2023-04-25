@@ -1,9 +1,10 @@
 
 using Plots
 using Printf
+using DSP
 using Statistics, StatsPlots
-using Polynomials
-using ControlSystems
+#using Polynomials
+#using ControlSystems
 """
 using LinearAlgebra
 using Plots
@@ -44,14 +45,18 @@ impulse = false
 imp_pos = [20,20,20]
 imp_val_p = 10
 harmonic = true
-harm_pos = [2.0,0.75,1.2]
+harm_pos = [2.2,1.8,1.2]
+meas_position1 = [2.2,1.8,1.2]
+meas_position2 = [3.2,1.8,1.2]
+meas_position3 = [3.2,2.4,1.2]
+
 harmonic_directional = false
-freq = 400
-po = 2*10^(-5)
-p0 = 2*10^(-5)
-A = 100
+freq = 20
+po = 20*10^(-6)
+p0 = 20*10^(-6)
+A = 999999999
 fs = 3000
-R = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+R = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 ######################################
 
 ####### Box parameters ###############
@@ -212,27 +217,6 @@ function case(n::Int64)
 end
 
 
-"""
-Old function to handle case parsing. --> Did only consider used labels, changed with function above that consider both used and unused
-
-function case(n::Integer)
-    Diffusor = false
-    if n < 0
-        Diffusor = true
-        n = abs(n)
-    end
-    digits_set = Set(Int[])
-    while n > 0
-        digit = n % 10
-        push!(digits_set, digit)
-        n = div(n, 10)    
-    end
-
-
-    return digits_set, Diffusor
-end
-"""
-
 function mark_box_walls(arr::Array{Float64,3}, d, corners)
     for i in 1:size(arr, 1)
         for j in 1:size(arr, 2)
@@ -266,7 +250,8 @@ function merges(A::Int64, B::Int64)::Int64
     return parse(Int64, join(sort(A_digits)))
 end
 
-
+"""
+Wrong code, doesnt work
 function merge(A::Int64, B::Float64)
     # Convert A and B to integers
     int_A = round(Int, A)
@@ -283,8 +268,22 @@ function merge(A::Int64, B::Float64)
 
     return int_result
 end
+"""
 
+function merge(A::Int, B::Int)::Int
+    # Concatenate A and B as strings
+    str = string(A, B)
 
+    # Remove duplicates and sort the remaining characters
+    unique_chars = sort(unique(str))
+
+    # Convert the sorted string back to an integer and return it
+    result = 0
+    for c in unique_chars
+        result = result * 10 + (c - '0')
+    end
+    return result
+end
 
 
 function place_wall(arr::Array{Int64, 3}, x_pos::Array{Float64, 1}, y_pos::Array{Float64, 1}, z_pos::Array{Float64, 1}, Δd::Float64)
@@ -296,10 +295,10 @@ function place_wall(arr::Array{Int64, 3}, x_pos::Array{Float64, 1}, y_pos::Array
                 for k in Int(ceil(z_pos[1]/Δd)):Int(floor(z_pos[2]/Δd))
                     B = arr[i,j,k]
                     if (((i*Δd - x_pos[1] >= -Δd)) && ((i*Δd - x_pos[1]) < 0))
-                        X = 2.0
+                        X = 2
                         arr[i,j,k] = merge(B,X)
                     elseif (((i*Δd - x_pos[1]) <= Δd) && ((i*Δd - x_pos[1]) > 0))
-                        X = 1.0
+                        X = 1
                         arr[i,j,k] = merge(B,X)
                         
                     end
@@ -316,10 +315,10 @@ function place_wall(arr::Array{Int64, 3}, x_pos::Array{Float64, 1}, y_pos::Array
                 for k in Int(ceil(z_pos[1]/Δd)):Int(floor(z_pos[2]/Δd))
                     B = arr[i,j,k]
                     if (((j*Δd - y_pos[1]) >= -Δd) && ((j*Δd - y_pos[1]) < 0))
-                        Y = 4.0
+                        Y = 4
                         arr[i,j,k] = merge(B,Y)
                     elseif (((j*Δd - y_pos[1]) <= Δd) && ((j*Δd - y_pos[1]) > 0))
-                        Y = 3.0
+                        Y = 3
                         arr[i,j,k] = merge(B,Y)
                     end
                         
@@ -333,14 +332,13 @@ function place_wall(arr::Array{Int64, 3}, x_pos::Array{Float64, 1}, y_pos::Array
                 for k in 1:size(arr,3)
                     B = arr[i,j,k]
                     if (((k*Δd - z_pos[1]) >= -Δd) && ((k*Δd - z_pos[1]) < 0))
-                        Z = 6.0
+                        Z = 6
                         arr[i,j,k] = merge(B,Z)
                     elseif (((k*Δd - z_pos[1]) <= Δd) && ((k*Δd - z_pos[1]) > 0))
-                        Z = 5.0
+                        Z = 5
                         arr[i,j,k] = merge(B,Z)
 
                     end
-                        
                 end
             end
         end
@@ -356,6 +354,7 @@ function calculate_pressure_matrix(Labeled_tlm::Array{Int64,3}, SN::Array{Float6
         for j in 1:size(Labeled_tlm,2)
             for k in 1:size(Labeled_tlm,3)
                 if Labeled_tlm[i,j,k] == 0
+                    #println("Free space")
                     #println("Label = 0")
                     PN[i,j,k] = SS[i - 1, j, k]
                     PE[i,j,k] = SW[i, j + 1, k]
@@ -436,6 +435,13 @@ function replace_edges_with_one(arr::AbstractArray{T,N}) where {T,N}
 end
 
 """
+
+
+function generate_noise_signal(N, t::Float64, dB)
+    pressure = 10^(dB/20) * 20e-6  # calculate the pressure level from dB
+    return randn(N) .* sqrt(t) .* pressure
+end
+
 
 function pressure_value(t::Float64)
     return A*sin(t*2*pi*freq)
@@ -649,8 +655,18 @@ function plot_arrays(arr1::Array, arr2::Array, arr3::Array, fs::Int64)
     xlabel!("Time (s)")
     ylabel!("Magnitude (dB)")
     title!("Time weighted sound pressure \nlevel at three positions")
-    ylims!((0,100))
-    savefig("Pressure drop.png")
+    #ylims!((0,100))
+    #savefig("Pressure drop.png")
+end
+
+function plot_array(arr1::Array, fs::Int64)
+    t = collect(0:length(arr1)-1) / fs
+    plot(t, arr1, label="Mic @source (dB)")
+    xlabel!("Time (s)")
+    ylabel!("Magnitude (dB)")
+    title!("Time weighted sound pressure \nlevel at three positions")
+    #ylims!((0,100))
+    #savefig("Plot_1.png")
 end
 
 
@@ -668,8 +684,12 @@ end
 function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Array{Float64,3}, SE::Array{Float64,3}, SS::Array{Float64,3}, SW::Array{Float64,3}, SU::Array{Float64,3}, SD::Array{Float64,3},PN::Array{Float64,3}, PE::Array{Float64,3}, PS::Array{Float64,3}, PW::Array{Float64,3}, PU::Array{Float64,3}, PD::Array{Float64,3})
     Δt = (Δd / c)
     println("Sampling frequency fs: ", 1 / Δt)
-    N = T ÷ Δt
+    N = Int(T ÷ Δt)
+    println(typeof(N))
     println("The tot iteration number is: ",N)
+    sound_level = 144.0
+    WHITE_NOISE = generate_noise_signal(N, Δt, sound_level)
+
     p_node = [10, 10, 10]
     p_arr = Float64[]
     L = size(pressure_grid,1)
@@ -679,9 +699,9 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
     meas_pos1 = []
     meas_pos2 = []
     meas_pos3 = []
-    ind2 = _real_to_index([2.0,0.75,1.2], Δd)
-    ind1 = _real_to_index([2.0,1.75,1.2], Δd)
-    ind3 = _real_to_index([2.0,2.5,1.2], Δd)
+    ind1 = _real_to_index(meas_position1, Δd)
+    ind2 = _real_to_index(meas_position2, Δd)
+    ind3 = _real_to_index(meas_position3, Δd)
     println(ind1)
     println(ind2)
 
@@ -706,7 +726,7 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
         end
 
          # Use the global boolean parameter harmonic if the grid should experience a harmonic time signal - Will work as a point source located at a single node 
-        if harmonic == true && n < _time_to_samples(0.2)
+        if (harmonic == true) && (n < _time_to_samples(0.2))
             if n == 1
                 println("Insert Harmonic signal")
             end
@@ -737,7 +757,7 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
         
         # Step 2 - Calculate overall pressure
         pressure_grid = overal_pressure(PN, PE, PS, PW, PU, PD)
-        println("Step:\t",n)
+        #println("Step:\t",n)
         #println(pressure_grid)
         #push!(p_arr, pressure_grid[15,14,14])
 
@@ -752,7 +772,9 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
         push!(meas_pos1, meas1)
         push!(meas_pos2, meas2)
         push!(meas_pos3, meas3)
-        push!(p_arr, sqrt((1/(L*M*N_length))*sum(pressure_grid.^2)))
+        #push!(p_arr)
+        #push!(p_arr, sqrt((1/(L*M*N_length))*sum(pressure_grid.^2)))
+
 
         """
         println("PN : ",PN)
@@ -788,9 +810,9 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
     
     
 
-    p1 = ltau(meas_pos1, fs, 0.0125, p0)
-    p1_2 = ltau(meas_pos2, fs, 0.0125, p0)
-    p1_3 = ltau(meas_pos3, fs, 0.0125, p0)
+    p1 = ltau(meas_pos1, fs, Δt*4, p0)
+    p1_2 = ltau(meas_pos2, fs, Δt*4, p0)
+    p1_3 = ltau(meas_pos3, fs, Δt*4, p0)
 
     
     
@@ -802,8 +824,19 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
     #p_arr = _Lp(p_arr)
     #println("Calculating L_eq")
 
-    find_t30(p1_3, x, _time_to_samples(0.2)-10, L*Δd, M*Δd, N_length*Δd)
-    #plot_arrays(p1, p1_2, p1_3, fs)
+    #find_t30(p_arr, x, _time_to_samples(0.2)-10, L*Δd, M*Δd, N_length*Δd)
+    #plot_arrays(meas_pos2, meas_pos2, meas_pos3, fs)
+
+    plot(
+        plot(x, meas_pos2, label="Pressure values"),
+        plot(x, p1_2, label="Time weighted sound level"),
+        layout=(1,2),
+        size=(800,400),
+    )
+    savefig("20 Hz twsl vs pressure R equal zero.png")
+
+
+
 end
 
 
@@ -830,7 +863,7 @@ function plot_binary_heatmap_3d(data::Array{Int, 3})
     z = repeat(1:nz, inner=(nx,ny))
     v = permutedims(binary_data, [3, 2, 1])
     
-    heatmap(x, y, z, v, color=:grays, colorbar=false, camera=(50, 30), xlabel="x", ylabel="y", zlabel="z")
+    display(heatmap(x, y, z, v, color=:grays, colorbar=false, camera=(50, 30), xlabel="x", ylabel="y", zlabel="z"))
 end
 
 
@@ -841,11 +874,11 @@ end
 
 
 
-Δd = c / fs
+Δd = c / (fs)
 
 Labeled_tlm, pressure_grid, SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD = create_shoebox(Δd, 4.0, 3.0, 2.5)
 
-boxshape = draw_box_closed([3.5, 0.5, 0.2], 2, d_box, b_box, h_box, N_QRD, b_QRD, d_max_QRD, d_vegger, d_bakplate, d_skilleplate, d_absorbent_QRD)
+#boxshape = draw_box_closed([3.5, 0.5, 0.2], 2, d_box, b_box, h_box, N_QRD, b_QRD, d_max_QRD, d_vegger, d_bakplate, d_skilleplate, d_absorbent_QRD)
 
 
 
@@ -855,10 +888,10 @@ for (i,plane) in enumerate(boxshape)
     println("w",i, "\t", plane)
     place_wall(Labeled_tlm, plane[1], plane[2], plane[3], Δd)
 end
-
-plot_heatmap(Labeled_tlm[:,:,100])
+e
 """
 
+#plot_heatmap(Labeled_tlm[:,:,2])
 iterate_grid(0.8, Δd, pressure_grid, SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD)
 
 

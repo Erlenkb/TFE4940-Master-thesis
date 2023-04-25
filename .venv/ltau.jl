@@ -23,5 +23,5 @@ function ltau(p,fs::Int64,τ::Real,pref::Real=p0())
 	y=filt(htau,p2)                        #filtering
 	y=1/(pref^2)*y[bufsize+1:end]          #adjusting the length to that of the input vector
 	l=db.(y)
-	return d
+	return l
 end
