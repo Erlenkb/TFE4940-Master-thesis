@@ -3,8 +3,8 @@ import numpy as np
 
 
 ####### Parameterverdier ######
-tykkelse_kryssfiner = 0.015
-tykkelse_absorbent_bunn_15mm = 0.015
+tykkelse_kryssfiner = 0.018
+tykkelse_absorbent_bunn_15mm = 0.012
 tykkelse_absorbent_bunn_20mm = 0.02
 f_0Box = 400
 f_nedregrense = 250

@@ -70,7 +70,7 @@ end
 
 
 T = 1
-N = 100
+N = 500
 freq = 20
 time = range(0, stop=T, length=N)
 f(x) = 1*sin(x*2*pi*freq)

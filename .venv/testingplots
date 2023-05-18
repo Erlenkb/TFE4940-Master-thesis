@@ -1,0 +1,19 @@
+# Create three 2D arrays to use as data for the heatmaps
+data1 = rand(10, 10)
+data2 = rand(10, 10)
+data3 = rand(10, 10)
+
+# Create a 1D array to use as data for the regular plot
+data4 = rand(20)
+plotlyjs()
+# Create the subplot
+subplot(
+    # First row: three heatmaps
+    heatmap(data1, aspect_ratio=:equal, colorbar=false),
+    heatmap(data2, aspect_ratio=:equal, colorbar=false),
+    heatmap(data3, aspect_ratio=:equal, colorbar=false),
+    # Second row: regular plot
+    plot(data4),
+    layout=(1,4), # 1 row, 4 columns
+    size=(800, 400) # Adjust size as needed
+)
