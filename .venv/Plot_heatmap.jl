@@ -10,65 +10,92 @@ computes and plot the heatmap for the given pressure array. save the animation a
 
 
 function _heatmap_gif11(p, N, time, Δd, title) 
-
+    stepsize = 1
     println("Initializing Gif creation")
-    aspect_ratio = size(p[1],1) / size(p[1],2)
+    aspect_ratio = size(p[1], 1) / size(p[1], 2)
 
-    nx = size(p[1],1)
-    ny = size(p[1],2)
-    step_x = nx / 4
-    step_y = ny / 4
-    xtick_values = collect(1:step_x:(nx*Δd))
-    ytick_values = collect(1:step_y:(ny*Δd))
-    prog3 = Progress(N)
+    nx = size(p[1], 2)
+    ny = size(p[1], 1)
+    step_x_val = (nx) / 4
+    step_y_val = (ny) / 4
+    step_x_lbl = (nx * Δd) / 4
+    step_y_lbl = (ny * Δd) / 4
+    xtick_values = collect(0:step_x_val:(nx))
+    ytick_values = collect(0:step_y_val:(ny))
+
+    xtick_time = [x != 0 ? parse(Float64, @sprintf("%.3e", x)) : x for x in collect(0:(Time/3):Time)]
+    
+    
+    xtick_time_lbl = string.(xtick_time)
+
+    xtick_label = string.([@sprintf("%.2f", x) for x in collect(0:step_x_lbl:(nx * Δd))])
+    ytick_label = string.([@sprintf("%.2f", x) for x in collect(0:step_y_lbl:(ny * Δd))])
+
+    prog3 = Progress(Int(N ÷ stepsize))
+
     # Create the heatmap plot with custom tick values and custom size
     layout = @layout [a;b{0.08h}]
 
     # Define the log range as 0 to -55 dB.
-
     lim_pos_strength = impulse ? imp_val_p : signal_strength_Pa
-    lim_pos = 10*log10(2*lim_pos_strength)
-    lim_neg = 10*log10(0.0000005)
+    lim_pos = 10 * log10(2 * lim_pos_strength)
+    lim_neg = 10 * log10(1 / (2 * lim_pos_strength^2))
 
     # Initialize the plot layout with the heatmap and timeplot
     plot1 = Plots.plot(
-        Plots.heatmap(p[1], color=:viridis, clims=(lim_neg,lim_pos), xticks=xtick_values, yticks=ytick_values),
-        Plots.plot(
-            0, [0], xlims=(minimum(time), maximum(time)), ylims=(0,1),yticks=[],ylabel="Progress", xlabel="Time [s]"
+        Plots.heatmap(
+            p[1],
+            color = :plasma,
+            clims = (lim_neg, lim_pos),
+            xticks = (xtick_values, xtick_label),
+            yticks = (ytick_values, ytick_label)
+            
         ),
-        layout=layout, size=(900, 600 * aspect_ratio + 50)
+        Plots.plot(
+            0,
+            [0],
+            xlims = (minimum(time), maximum(time)),
+            ylims = (0, 1),
+            yticks = [],
+            xticks = (xtick_time,xtick_time_lbl),
+            ylabel = "Progress",
+            xlabel = "Time [s]"
+        ),
+        layout = layout,
+        size = (900, 600 * aspect_ratio + 50)
     )
 
     # Define parameters for the plot
     plot1[2][:yaxis][:tickfont] = font(6)
     plot1[2][:yaxis][:ticksize] = 0
-    plot1[2][:margin] = 5Plots.px
+    plot1[2][:margin] = 20Plots.px
     plot1[2][:foreground_color] = :black
     plot1[2][:background_color] = :white
-    plot1[2][:size] = (1, 0.1)
-
+    plot1[2][:size] = (1, 0.15)
 
     # Create an animation for N amount of steps updating the plot1 layout
-    anim = @animate for i=2:1:N
-        heatmap!(p[i], color=:viridis, clims=(lim_neg,lim_pos), xticks=xtick_values,yticks=ytick_values)
+    anim = @animate for i = 2:stepsize:N
+        heatmap!(
+            p[i],
+            color = :plasma,
+            clims = (lim_neg, lim_pos),
+            xticks = (xtick_values, xtick_label),
+            
+        )
         t = time[i]
-        x = [t,t]
-        y = [0,1]
-        plot!(plot1[2], x, y, color="blue", legend=false)
+        x = [t, t]
+        y = [0, 1]
+        plot!(plot1[2], x, y, color = "blue", legend = false, xticks = (xtick_time,xtick_time_lbl))
         plot1
         next!(prog3)
     end
 
     # Creating the animated gif and storing it using the title string and setting the fps value
     println("\nCreating Gif")
-    gif(anim, title, fps=10)
+    gif(anim, title, fps = 3)
     println("\nGif created")
-    
-
-
-
-    
 end
+
 
 
 
@@ -229,7 +256,7 @@ function _heatmap_gif(p, N, time, Δd)
     ytick_values = collect(1:step_y:(ny*Δd))
     
     # Set the plot limits and colormap
-    lim_pos = 10*log10((A/9)^2)
+    lim_pos = 10*log10((2*A)^2)
     lim_neg = 10*log10(0.000005)
     cmap = :viridis
     
@@ -269,7 +296,7 @@ function _heatmap_gif(p, N, time, Δd)
     
     # Save the animation as a gif
     println("Creating Gif")
-    gif(anim, "heatmaps.gif", fps=10)
+    gif(anim, "heatmaps.gif", fps=25)
     println("Gif created")
 end
 

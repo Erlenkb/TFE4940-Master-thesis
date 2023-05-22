@@ -1,12 +1,31 @@
 
 
+function Reflection(Z_a, Z_T)
+    Γ = (Z_a - Z_T) / (Z_a + Z_T)
+    R = ((1+Γ) - sqrt(2)*(1-Γ)) / ((1+Γ) + sqrt(2)*(1-Γ))
+    return R
+end
+
+
+
+
+
+
+
+
+
 """
-    calculate_pressure_matrix(labeled_tlm, SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD)
+    calculate_pressure_matrix(labeled_tlm, SN, SE, SS, SW, SU, SD, IN, IE, IS, IW, IU, ID)
 
 Computes the pressure matrix given by the scattering matrix and the labaled tlm to make sure what values to be used. 
 """
 
-function calculate_pressure_matrix(
+
+
+
+reflection = [Reflection(R[x],Z_T) for x in 1:6]
+
+function propagate(
     Labeled_tlm::Array{Int64,3}, 
     SN::Array{Float64,3}, 
     SE::Array{Float64,3}, 
@@ -14,71 +33,89 @@ function calculate_pressure_matrix(
     SW::Array{Float64,3}, 
     SU::Array{Float64,3}, 
     SD::Array{Float64,3},
-    PN::Array{Float64,3}, 
-    PE::Array{Float64,3}, 
-    PS::Array{Float64,3}, 
-    PW::Array{Float64,3}, 
-    PU::Array{Float64,3}, 
-    PD::Array{Float64,3})
+    IN::Array{Float64,3}, 
+    IE::Array{Float64,3}, 
+    IS::Array{Float64,3}, 
+    IW::Array{Float64,3}, 
+    IU::Array{Float64,3}, 
+    ID::Array{Float64,3})
 
-
+    
 
     for i in 1:size(Labeled_tlm,1)
         for j in 1:size(Labeled_tlm,2)
             for k in 1:size(Labeled_tlm,3)
-
+                #println("************************")
                 if Labeled_tlm[i,j,k] != 0
-
+                    
                     case_used, case_unused, diffusor = case(Labeled_tlm[i,j,k])
                     
                     for n in case_used
-                        Refl = diffusor ? R[6] : R[n]
+                        Refl = diffusor ? reflection[6] : reflection[n]
 
+                        #println("n: ", n, "\t case_used: ", case_used, "\t case_unused: ",case_unused, )
                         if n == 1
-                            PN[i,j,k] = Refl * SN[i,j,k]                        
+                            IN[i,j,k] = Refl * SN[i,j,k]    
+                            #println("reflected north")                  
                         elseif n == 2
-                            PS[i,j,k] = Refl * SS[i,j,k]
+                            IS[i,j,k] = Refl * SS[i,j,k]
+                            #println("reflected south")    
                         elseif n == 3
-                            PW[i,j,k] = Refl * SW[i,j,k]
+                            IW[i,j,k] = Refl * SW[i,j,k]
+                            #println("reflected west")    
                         elseif n == 4
-                            PE[i,j,k] = Refl * SE[i,j,k]
+                            IE[i,j,k] = Refl * SE[i,j,k]
+                            #println("reflected east")    
                         elseif n == 5
-                            PD[i,j,k] = Refl * SD[i,j,k]
+                            ID[i,j,k] = Refl * SD[i,j,k]
+                            #println("reflected down")    
                         elseif n == 6
-                            PU[i,j,k] = Refl * SU[i,j,k]
+                            IU[i,j,k] = Refl * SU[i,j,k]
+                            #println("reflected up")    
                         end
                     end
 
                     for n in case_unused
                         if n == 1
-                            PN[i,j,k] = SS[i - 1, j, k]
+                            IN[i,j,k] = SS[i - 1, j, k]
+                            #println("not reflected north")
                         elseif n == 2
-                            PS[i,j,k] = SN[i + 1, j, k]
+                            IS[i,j,k] = SN[i + 1, j, k]
+                            #println("not reflected south")
                         elseif n == 3
-                            PW[i,j,k] = SE[i, j - 1, k]
+                            IW[i,j,k] = SE[i, j - 1, k]
+                            #println("not reflected west")
                         elseif n == 4
-                            PE[i,j,k] = SW[i, j + 1, k]
+                            IE[i,j,k] = SW[i, j + 1, k]
+                            #println("not reflected east")
                         elseif n == 5
-                            PD[i,j,k] = SU[i, j, k - 1]
+                            ID[i,j,k] = SU[i, j, k - 1]
+                            #println("not reflected down")
                         elseif n == 6
-                            PU[i,j,k] = SD[i, j, k + 1]
+                            IU[i,j,k] = SD[i, j, k + 1]
+                            #println("not reflected up")
                         end
                     end
-
                 else
-                    PN[i,j,k] = SS[i - 1, j, k]
-                    PE[i,j,k] = SW[i, j + 1, k]
-                    PS[i,j,k] = SN[i + 1, j, k]
-                    PW[i,j,k] = SE[i, j - 1, k]
-                    PU[i,j,k] = SD[i, j, k + 1]
-                    PD[i,j,k] = SU[i, j, k - 1]
-
+                    #println("Did the fluid")
+                    IN[i,j,k] = SS[i - 1, j, k]
+                    IE[i,j,k] = SW[i, j + 1, k]
+                    IS[i,j,k] = SN[i + 1, j, k]
+                    IW[i,j,k] = SE[i, j - 1, k]
+                    IU[i,j,k] = SD[i, j, k + 1]
+                    ID[i,j,k] = SU[i, j, k - 1]
                 end
+                #println(IN[i,j,k])
+                #println(IE[i,j,k])
+                #println(IS[i,j,k])
+                #println(IW[i,j,k])
+                #println(IU[i,j,k])
+                #println(ID[i,j,k])
             end
         end
     end
 
-    return SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD
+    return IN, IE, IS, IW, IU, ID
 end
 
 
@@ -89,33 +126,28 @@ end
 
 
 """
-    calculate_scattering_matrix( SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD)
+    calculate_scattering_matrix( SN, SE, SS, SW, SU, SD, IN, IE, IS, IW, IU, ID)
 
 Computes the scattering matrix given the pressure matrix.
 """
 
 
-function calculate_scattering_matrix(
-    SN::Array{Float64,3}, 
-    SE::Array{Float64,3}, 
-    SS::Array{Float64,3}, 
-    SW::Array{Float64,3}, 
-    SU::Array{Float64,3}, 
-    SD::Array{Float64,3},
-    PN::Array{Float64,3}, 
-    PE::Array{Float64,3}, 
-    PS::Array{Float64,3}, 
-    PW::Array{Float64,3}, 
-    PU::Array{Float64,3}, 
-    PD::Array{Float64,3})
-    SW = (1/3) .* ((-2*PW) .+ PN .+ PE .+ PS .+ PU .+ PD)
-    SN = (1/3) .* (PW .+ (-2*PN) .+ PE .+ PS .+ PU .+ PD)
-    SE = (1/3) .* (PW .+ PN .+ (-2*PE) .+ PS .+ PU .+ PD)
-    SS = (1/3) .* (PW .+ PN .+ PE .+ (-2*PS) .+ PU .+ PD)
-    SU = (1/3) .* (PW .+ PN .+ PE .+ PS .+ (-2*PU) .+ PD)
-    SD = (1/3) .* (PW .+ PN .+ PE .+ PS .+ PU .+ (-2*PD))
+function scattering(
+    IN::Array{Float64,3}, 
+    IE::Array{Float64,3}, 
+    IS::Array{Float64,3}, 
+    IW::Array{Float64,3}, 
+    IU::Array{Float64,3}, 
+    ID::Array{Float64,3})
 
-    return SN, SE, SS, SW, SU, SD, PN, PE, PS, PW, PU, PD
+    SW = (1/3) * ((-2*IW) .+ IN .+ IE .+ IS .+ IU .+ ID)
+    SN = (1/3) * (IW .+ (-2*IN) .+ IE .+ IS .+ IU .+ ID)
+    SE = (1/3) * (IW .+ IN .+ (-2*IE) .+ IS .+ IU .+ ID)
+    SS = (1/3) * (IW .+ IN .+ IE .+ (-2*IS) .+ IU .+ ID)
+    SU = (1/3) * (IW .+ IN .+ IE .+ IS .+ (-2*IU) .+ ID)
+    SD = (1/3) * (IW .+ IN .+ IE .+ IS .+ IU .+ (-2*ID))
+
+    return SN, SE, SS, SW, SU, SD
 
 end
 

@@ -22,7 +22,7 @@ computes the pressure value for the given time step 't'
 
 
 function pressure_value(t::Float64)
-    return signal_strength_Pa*sin(t*2*pi*freq)
+    return signal_strength_Pa*cos(t*2*pi*freq)
 end
 
 
@@ -42,20 +42,20 @@ end
 
 
 """
-    overal_pressure(PN, PE, PS, PW, PU, PD)
+    overal_pressure(IN, IE, IS, IW, IU, ID)
 
 computes the overall pressure inside the pressure grid given by the 6 transmission lines.
 """
 
 
 function overal_pressure(
-    PN::Array{Float64,3}, 
-    PE::Array{Float64,3}, 
-    PS::Array{Float64,3}, 
-    PW::Array{Float64,3}, 
-    PU::Array{Float64,3}, 
-    PD::Array{Float64,3})
-    P_grid = (1/3) .* (PW .+ PN .+ PE .+ PS .+ PU .+ PD)
+    IN::Array{Float64,3}, 
+    IE::Array{Float64,3},
+    IS::Array{Float64,3}, 
+    IW::Array{Float64,3}, 
+    IU::Array{Float64,3}, 
+    ID::Array{Float64,3})
+    P_grid = (1/3) .* (IW .+ IN .+ IE .+ IS .+ IU .+ ID)
     return P_grid
 end
 
@@ -71,8 +71,10 @@ return the 20*log(p/p0)
 
 
 function _Lp(arr)
-    return 20 .* log10.(arr ./ po)
+    return 20 .* log10.(arr / p0)
 end
+
+
 
 
 
