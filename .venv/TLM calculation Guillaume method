@@ -95,7 +95,7 @@ function propagate(
 
 
                     # Edges  --  
-                    elseif case == 13
+                    elseif case == 12
                         IN[i,j,k] = Refl * SN[i,j,k]
                         IE[i,j,k] = SW[i, j + 1, k]
                         IS[i,j,k] = SN[i + 1, j, k]

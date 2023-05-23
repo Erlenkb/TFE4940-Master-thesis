@@ -1,11 +1,16 @@
+Temp = 291
+ρ_air = 1.225
+c = 343.2*sqrt(Temp/293)
+Z_T = c *ρ_air
 
-
+Z_a_wood = 2200500
+R = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+#R = [1,1,1,1,1,1,1]
 function Reflection(Z_a, Z_T)
     Γ = (Z_a - Z_T) / (Z_a + Z_T)
-    R = ((1+Γ) - sqrt(2)*(1-Γ)) / ((1+Γ) + sqrt(2)*(1-Γ))
-    return R
+    Re = ((1+Γ) - sqrt(2)*(1-Γ)) / ((1+Γ) + sqrt(2)*(1-Γ))
+    return Re
 end
-
 
 
 
@@ -23,7 +28,7 @@ Computes the pressure matrix given by the scattering matrix and the labaled tlm 
 
 
 
-reflection = [Reflection(R[x],Z_T) for x in 1:6]
+reflection = R #[Reflection(R[x],Z_T) for x in 1:6]
 
 function propagate(
     Labeled_tlm::Array{Int64,3}, 

@@ -55,7 +55,7 @@ Temp = 291
 ρ_air = 1.225
 c = 343.2*sqrt(Temp/293)
 freq = 150
-fs = 3200
+fs = 4000
 Time = 0.8
 po = 2e-5
 p0 = 2e-5
@@ -73,8 +73,8 @@ R = [Z_a_wood, Z_a_wood, Z_a_wood, Z_a_wood, Z_a_wood, Z_a_wood, Z_a_wood]
 #R = [0,0,0,0,0,0]
 
 # What type of source should be used. priority directional -> harmonic -> impulse
-impulse = false
-harmonic = true
+impulse = true
+harmonic = false
 harmonic_directional = false
 
 # Positions for the different sources and microphone positions. Given in meters
@@ -87,7 +87,7 @@ meas_position3 = [3.2,2.4,1.2]
 # Strength value for the impulse value and harmonic source as well as the total time the source should be on
 # Strength given in Pascal
 imp_val_p = 1
-signal_strength_Pa = 100
+signal_strength_Pa = 1
 time_source = 0.2
 
 
@@ -292,9 +292,11 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
         ######## Step 2 - Calculate overall pressure
         pressure_grid = overal_pressure(IN, IE, IS, IW, IU, ID)
 
+        #display(pressure_grid)
 
+        push!(p_arr, sum(pressure_grid))
         ######## Step 2.1 - Insert values into different arrays for plots and animation
-         
+        """
         meas1 = pressure_grid[ind1[1],ind1[2],ind1[3]]
         meas2 = pressure_grid[ind2[1],ind2[2],ind2[3]]
         meas3 = pressure_grid[ind3[1],ind3[2],ind3[3]]
@@ -311,7 +313,7 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
         push!(meas_pos3, meas3)
 
         push!(p_arr, sqrt((1/(L*M*N_length))*sum(pressure_grid.^2)))
-
+        """
         
 
 
@@ -365,24 +367,26 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
     x = collect(range(0, stop=(N-1)*Δt, step=Δt))
 
     # Create the time weigthed sound power level using the ´ltau´ function from Guillaume D.
-    p1 = ltau(meas_pos1, fs, 10*Δt, p0)
-    p1_2 = ltau(meas_pos2, fs, 10*Δt, p0)
-    p1_3 = ltau(meas_pos3, fs, 10*Δt, p0)
+    #p1 = ltau(meas_pos1, fs, 10*Δt, p0)
+    #p1_2 = ltau(meas_pos2, fs, 10*Δt, p0)
+    #p1_3 = ltau(meas_pos3, fs, 10*Δt, p0)
 
     #press_arr = replace(press_arr, NaN => 0.0)
     #press_arr = convert(Vector{Float64}, map(x -> parse(Float64, x), press_arr))
 
 
     # Create a pressure array using the ´_Lp´ function
-    p_arr = _Lp(p_arr)
-    #Plots.plot(x, meas_pos3, xlabel="Time (s)", ylabel="Pressure (dB)", label="Pressure")
+    #p_arr = _Lp(p_arr)
+    Plots.plot(x, p_arr, xlabel="Time (s)", ylabel="Pressure", label="Overall Pressure", title=string("Total energy with R=1\nmax val: ", @sprintf("%.3e",maximum(p_arr)), "\tmin val: ", @sprintf("%.3e",minimum(p_arr))), yaksis=:log10)
+    #println("max val: ", maximum(p_arr), "\tmin val: ", minimum(p_arr))
+
     #Plots.savefig("Impulse response free field.png")
 
    
    
     # Different actions to be done on the finished result. remve comment mark and edit the input parameters to alter the functions.
     #find_t60(p1_3, x, _time_to_samples(time_source,Δt)-10, L*Δd, M*Δd, N_length*Δd)
-    plot_arrays(p1, p1_2, p1_3, Δt)
+    #plot_arrays(p1, p1_2, p1_3, Δt)
     #_heatmap_gif11(gif_arr_x, N,x, Δd, string("R=",R[1], " ",freq, " Hz  fs ",fs , " ",T," s source ", impulse ? "Impulse" : "Harmonic" ," x plane.gif"))
     #_heatmap_gif11(gif_arr_y, N,x, Δd, string("R=",R[1], " ",freq, " Hz  fs ",fs , " ",T," s source ", impulse ? "Impulse" : "Harmonic" ," y plane.gif"))
     #_heatmap_gif11(gif_arr_z, N,x, Δd, string("R=",R[1], " ",freq, " Hz  fs ",fs , " ",T," s source ", impulse ? "Impulse" : "Harmonic" ," z plane.gif"))
