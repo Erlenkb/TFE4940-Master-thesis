@@ -1,11 +1,4 @@
-Temp = 291
-ρ_air = 1.225
-c = 343.2*sqrt(Temp/293)
-Z_T = c *ρ_air
 
-Z_a_wood = 2200500
-R = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
-#R = [1,1,1,1,1,1,1]
 function Reflection(Z_a, Z_T)
     Γ = (Z_a - Z_T) / (Z_a + Z_T)
     Re = ((1+Γ) - sqrt(2)*(1-Γ)) / ((1+Γ) + sqrt(2)*(1-Γ))
@@ -28,8 +21,9 @@ Computes the pressure matrix given by the scattering matrix and the labaled tlm 
 
 
 
-reflection = R #[Reflection(R[x],Z_T) for x in 1:6]
+reflection = [0.5,0.5,0.5,0.5,0.5,0.5,0.5]#[Reflection(R[x],Z_T) for x in 1:6]
 
+println(reflection)
 function propagate(
     Labeled_tlm::Array{Int64,3}, 
     SN::Array{Float64,3}, 
@@ -37,13 +31,7 @@ function propagate(
     SS::Array{Float64,3}, 
     SW::Array{Float64,3}, 
     SU::Array{Float64,3}, 
-    SD::Array{Float64,3},
-    IN::Array{Float64,3}, 
-    IE::Array{Float64,3}, 
-    IS::Array{Float64,3}, 
-    IW::Array{Float64,3}, 
-    IU::Array{Float64,3}, 
-    ID::Array{Float64,3})
+    SD::Array{Float64,3})
 
     
 
@@ -60,10 +48,10 @@ function propagate(
 
                         #println("n: ", n, "\t case_used: ", case_used, "\t case_unused: ",case_unused, )
                         if n == 1
-                            IN[i,j,k] = Refl * SN[i,j,k]    
+                            IN[i,j,k] =  Refl * SN[i,j,k]    
                             #println("reflected north")                  
                         elseif n == 2
-                            IS[i,j,k] = Refl * SS[i,j,k]
+                            IS[i,j,k] =  Refl * SS[i,j,k]
                             #println("reflected south")    
                         elseif n == 3
                             IW[i,j,k] = Refl * SW[i,j,k]

@@ -34,7 +34,7 @@ include("Place objects into TLM.jl")
 include("TLM creation.jl")
 include("Acoustical operations.jl")
 include("TLM calculation.jl")
-#include("TLM calculation Guillaume method")
+#include("TLM calculation Guillaume method.jl")
 include("Plot_heatmap.jl")
 
 
@@ -55,7 +55,7 @@ Temp = 291
 ρ_air = 1.225
 c = 343.2*sqrt(Temp/293)
 freq = 150
-fs = 4000
+fs = 1200
 Time = 0.8
 po = 2e-5
 p0 = 2e-5
@@ -66,10 +66,11 @@ Z_a_concrete = 9500000
 Z_a_wood = 2200500
 #R = [0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95]
 #R = [Z_a_concrete, Z_a_concrete, Z_a_concrete, Z_a_concrete, Z_a_concrete, Z_a_concrete, Z_a_concrete] # The characteristic impedance for the different walls in the room
-R = [Z_a_wood, Z_a_wood, Z_a_wood, Z_a_wood, Z_a_wood, Z_a_wood, Z_a_wood]
-
+#R = [Z_a_wood, Z_a_wood, Z_a_wood, Z_a_wood, Z_a_wood, Z_a_wood, Z_a_wood]
+#R = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
 
 #R = [1,1,1,1,1,1,1]
+#R = [Z_T, Z_T, Z_T, Z_T, Z_T, Z_T, Z_T]
 #R = [0,0,0,0,0,0]
 
 # What type of source should be used. priority directional -> harmonic -> impulse
@@ -79,7 +80,7 @@ harmonic_directional = false
 
 # Positions for the different sources and microphone positions. Given in meters
 harm_pos = [2.2,1.8,1.2]
-imp_pos = [2.1,1.8,1.2]
+imp_pos = [3.0,2.0,2.0]
 meas_position1 = [2.3,2.0,1.2]
 meas_position2 = [3.2,1.8,1.2]
 meas_position3 = [3.2,2.4,1.2]
@@ -125,6 +126,7 @@ function find_t60(pressure::Vector{Float64}, time::Vector{Float64}, it::Int64, X
     # Find the start and end indices for the regression interval
 
     # Change to extrapolate to 60 dB drop
+    if (impulse == true) it = argmax(pressure) end
     start_index = it
     end_index = length(pressure)
     for i in it:length(pressure)
@@ -229,6 +231,13 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
     ind2 = _real_to_index(meas_position2, Δd)
     ind3 = _real_to_index(meas_position3, Δd)
 
+    IN_sum = []
+    IE_sum = []
+    IS_sum = []
+    IW_sum = []
+    IU_sum = []
+    ID_sum = [] 
+
     # Track the progress using progressmeter to better visualize ETA
     prog1 = Progress(N)
 
@@ -292,11 +301,20 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
         ######## Step 2 - Calculate overall pressure
         pressure_grid = overal_pressure(IN, IE, IS, IW, IU, ID)
 
+
         #display(pressure_grid)
 
-        push!(p_arr, sum(pressure_grid))
+        #push!(p_arr, sum(pressure_grid))
+
+        push!(IN_sum, sum(IN))
+        push!(IE_sum, sum(IE))
+        push!(IS_sum, sum(IS))
+        push!(IW_sum, sum(IW))
+        push!(ID_sum, sum(ID))
+        push!(IU_sum, sum(IU))
+
         ######## Step 2.1 - Insert values into different arrays for plots and animation
-        """
+        
         meas1 = pressure_grid[ind1[1],ind1[2],ind1[3]]
         meas2 = pressure_grid[ind2[1],ind2[2],ind2[3]]
         meas3 = pressure_grid[ind3[1],ind3[2],ind3[3]]
@@ -313,7 +331,7 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
         push!(meas_pos3, meas3)
 
         push!(p_arr, sqrt((1/(L*M*N_length))*sum(pressure_grid.^2)))
-        """
+        
         
 
 
@@ -349,7 +367,7 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
 
 
         ######## Step 4 - create the Incident matrix
-        IN, IE, IS, IW, IU, ID = propagate(Labeled_tlm, SN, SE, SS, SW, SU, SD, IN, IE, IS, IW, IU, ID)
+        IN, IE, IS, IW, IU, ID = propagate(Labeled_tlm, SN, SE, SS, SW, SU, SD)
         
        
 
@@ -367,9 +385,9 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
     x = collect(range(0, stop=(N-1)*Δt, step=Δt))
 
     # Create the time weigthed sound power level using the ´ltau´ function from Guillaume D.
-    #p1 = ltau(meas_pos1, fs, 10*Δt, p0)
-    #p1_2 = ltau(meas_pos2, fs, 10*Δt, p0)
-    #p1_3 = ltau(meas_pos3, fs, 10*Δt, p0)
+    p1 = ltau(meas_pos1, fs, 10*Δt, p0)
+    p1_2 = ltau(meas_pos2, fs, 10*Δt, p0)
+    p1_3 = ltau(meas_pos3, fs, 10*Δt, p0)
 
     #press_arr = replace(press_arr, NaN => 0.0)
     #press_arr = convert(Vector{Float64}, map(x -> parse(Float64, x), press_arr))
@@ -377,7 +395,17 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
 
     # Create a pressure array using the ´_Lp´ function
     #p_arr = _Lp(p_arr)
-    Plots.plot(x, p_arr, xlabel="Time (s)", ylabel="Pressure", label="Overall Pressure", title=string("Total energy with R=1\nmax val: ", @sprintf("%.3e",maximum(p_arr)), "\tmin val: ", @sprintf("%.3e",minimum(p_arr))), yaksis=:log10)
+    #Plots.plot(x, abs.(p_arr), xlabel="Time (s)", ylabel="Pressure", label="Overall Pressure", title=string("Total energy with R=1\nmax val: ", @sprintf("%.3e",maximum(p_arr)), "     min val: ", @sprintf("%.3e",minimum(p_arr))), yaxis=:log10)
+    #Plots.plot(x, IN_sum.-IS_sum, label="IN_sum")
+    #Plots.plot!(x, IE_sum.-IW_sum, label="IE_sum")
+    #Plots.plot!(x, p_arr, label="Overall pressure")
+    #Plots.plot!(x, abs.(IS_sum), label="IS_sum")
+    #Plots.plot!(x, abs.(IW_sum), label="IW_sum")
+    #Plots.plot!(x, IU_sum .- ID_sum, label="IU_sum")
+    #Plots.plot!(x, abs.(ID_sum), label="ID_sum")
+
+    #Plots.savefig("sum pressure all nodes.png")
+    #Plots.plot(x, 10*log10.((p_arr.^2) / p0^2))
     #println("max val: ", maximum(p_arr), "\tmin val: ", minimum(p_arr))
 
     #Plots.savefig("Impulse response free field.png")
@@ -385,7 +413,7 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
    
    
     # Different actions to be done on the finished result. remve comment mark and edit the input parameters to alter the functions.
-    #find_t60(p1_3, x, _time_to_samples(time_source,Δt)-10, L*Δd, M*Δd, N_length*Δd)
+    find_t60(10*log10.((p_arr.^2) / p0^2), x, _time_to_samples(time_source,Δt)-10, L*Δd, M*Δd, N_length*Δd)
     #plot_arrays(p1, p1_2, p1_3, Δt)
     #_heatmap_gif11(gif_arr_x, N,x, Δd, string("R=",R[1], " ",freq, " Hz  fs ",fs , " ",T," s source ", impulse ? "Impulse" : "Harmonic" ," x plane.gif"))
     #_heatmap_gif11(gif_arr_y, N,x, Δd, string("R=",R[1], " ",freq, " Hz  fs ",fs , " ",T," s source ", impulse ? "Impulse" : "Harmonic" ," y plane.gif"))
@@ -436,7 +464,11 @@ end
 """
 
 
-#place_wall(Labeled_tlm, [0.5, 3.0], [1.0, 1.0], [0.001, 2.5], Δd)
+#place_wall(Labeled_tlm, [0.5, 3.0], [1.0, 1.0], [0.001, 2.5], Δd) # Y plane
+#place_wall(Labeled_tlm, [0.5, 3.0], [0.5, 3.0], [1.0, 1.0], Δd) # Z plane 
+#place_wall(Labeled_tlm, [1.0, 1.0], [0.5, 3.0],[0.001, 2.5], Δd) # X plane
+
+
 
 # Dislay the labaled array to verify that the array is correctly created for fluid, walls, edges and corners.
 #display(Labeled_tlm)

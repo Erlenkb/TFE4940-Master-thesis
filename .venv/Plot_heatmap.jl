@@ -46,7 +46,7 @@ function _heatmap_gif11(p, N, time, Δd, title)
         Plots.heatmap(
             p[1],
             color = :plasma,
-            clims = (lim_neg, lim_pos),
+            clims = (-75, 0),
             xticks = (xtick_values, xtick_label),
             yticks = (ytick_values, ytick_label)
             
@@ -78,7 +78,7 @@ function _heatmap_gif11(p, N, time, Δd, title)
         heatmap!(
             p[i],
             color = :plasma,
-            clims = (lim_neg, lim_pos),
+            clims=(-75,0),
             xticks = (xtick_values, xtick_label),
             
         )
