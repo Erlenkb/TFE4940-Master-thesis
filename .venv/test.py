@@ -1,25 +1,32 @@
-from PIL import Image
+import matplotlib.pyplot as plt
 import math
 
-def change_fps(input_file, output_file, new_fps):
-    # Open the GIF file
-    gif = Image.open(input_file)
+def gaussian_pulse(timestep, peak_time, sigma):
+    amplitude = 1.0  # Amplitude of the Gaussian pulse
+    mean = peak_time  # Mean (center) of the Gaussian pulse
 
-    # Calculate the frame duration based on the desired fps
-    frame_duration = math.ceil(1000 / new_fps)  # Duration in milliseconds
+    # Calculate the value of the Gaussian pulse at the given timestep
+    value = amplitude * math.exp(-((timestep - mean) ** 2) / (2 * sigma ** 2))
 
-    # Modify the frame duration and disposal method for each frame
-    frames = []
-    for frame in range(gif.n_frames):
-        gif.seek(frame)
-        frame_copy = gif.copy()
-        frame_copy.info['duration'] = frame_duration
-        frame_copy.info['disposal'] = 2  # Set disposal method to "restore to background color"
-        frames.append(frame_copy)
+    return value
 
-    # Save the modified GIF to the output file
-    frames[0].save(output_file, save_all=True, append_images=frames[1:], loop=0, disposal=2)
+# Parameters for the Gaussian pulse
+peak_time = 10  # Center of the pulse
+sigma = 2  # Width of the pulse
 
+# Array to store the pulse values
+pulse_values = []
 
-change_fps("R=0.2 250 Hz  fs 22500 0.014 s  x plane.gif", "R=0.2 250 Hz fs 22500 0.014 s x plane new fps1.gif", 15)
-change_fps("R=0.2 250 Hz  fs 22500 0.014 s  y plane.gif", "R=0.2 250 Hz fs 22500 0.014 s y plane new fps1.gif", 15)
+# Iterate over timesteps and calculate Gaussian pulse values
+for timestep in range(20):
+    if timestep > 1 and timestep < 25:
+        value = gaussian_pulse(timestep, peak_time, sigma)
+        pulse_values.append(value)
+    else: pulse_values.append(0)
+
+# Plot the Gaussian pulse
+plt.plot(pulse_values)
+plt.xlabel('Timestep')
+plt.ylabel('Value')
+plt.title('Gaussian Pulse')
+plt.show()

@@ -21,7 +21,7 @@ Computes the pressure matrix given by the scattering matrix and the labaled tlm 
 
 
 
-reflection = [0.5,0.5,0.5,0.5,0.5,0.5,0.5]#[Reflection(R[x],Z_T) for x in 1:6]
+reflection = [-0.17,-0.17,-0.17,-0.17,-0.17,-0.17,-0.17]#[Reflection(R[x],Z_T) for x in 1:6]
 
 println(reflection)
 function propagate(
@@ -48,22 +48,28 @@ function propagate(
 
                         #println("n: ", n, "\t case_used: ", case_used, "\t case_unused: ",case_unused, )
                         if n == 1
-                            IN[i,j,k] =  Refl * SN[i,j,k]    
+                            if ((Refl * SN[i,j,k]) < 1e-8) IN[i,j,k] = 0
+                            else IN[i,j,k] =  Refl * SN[i,j,k] end
                             #println("reflected north")                  
                         elseif n == 2
-                            IS[i,j,k] =  Refl * SS[i,j,k]
+                            if ((Refl * SS[i,j,k]) < 1e-8) IS[i,j,k] = 0
+                            else IS[i,j,k] =  Refl * SS[i,j,k] end
                             #println("reflected south")    
                         elseif n == 3
-                            IW[i,j,k] = Refl * SW[i,j,k]
+                            if ((Refl * SW[i,j,k]) < 1e-8) IW[i,j,k] = 0
+                            else IW[i,j,k] = Refl * SW[i,j,k] end
                             #println("reflected west")    
                         elseif n == 4
-                            IE[i,j,k] = Refl * SE[i,j,k]
+                            if ((Refl * SE[i,j,k]) < 1e-8) IE[i,j,k] = 0
+                            else IE[i,j,k] = Refl * SE[i,j,k] end
                             #println("reflected east")    
                         elseif n == 5
-                            ID[i,j,k] = Refl * SD[i,j,k]
+                            if ((Refl * SD[i,j,k]) < 1e-8) ID[i,j,k] = 0
+                            else ID[i,j,k] = Refl * SD[i,j,k] end
                             #println("reflected down")    
                         elseif n == 6
-                            IU[i,j,k] = Refl * SU[i,j,k]
+                            if ((Refl * SU[i,j,k]) < 1e-8) IU[i,j,k] = 0
+                            else IU[i,j,k] = Refl * SU[i,j,k] end
                             #println("reflected up")    
                         end
                     end
@@ -71,6 +77,7 @@ function propagate(
                     for n in case_unused
                         if n == 1
                             IN[i,j,k] = SS[i - 1, j, k]
+
                             #println("not reflected north")
                         elseif n == 2
                             IS[i,j,k] = SN[i + 1, j, k]

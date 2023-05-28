@@ -1,7 +1,7 @@
 
 
 "Express an adimensional ratio in decibels"
-db(x)=10log10(x)
+db(x)=10log10(x .+ eps())
 
 """
     ltau(p,fs,τ,pref=p0())
@@ -25,3 +25,6 @@ function ltau(p,fs::Int64,τ::Real,pref::Real=p0())
 	l=db.(y)
 	return l
 end
+
+
+

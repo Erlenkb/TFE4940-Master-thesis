@@ -35,6 +35,7 @@ include("TLM creation.jl")
 include("Acoustical operations.jl")
 include("TLM calculation.jl")
 #include("TLM calculation Guillaume method.jl")
+include("test.jl")
 include("Plot_heatmap.jl")
 
 
@@ -50,13 +51,18 @@ Time weighted L_fast
 """
 
 
+# ISO 17497 -- Scattering standards
+
+
+###Gaussioan pulse and measure frequency dependent reverberation time
+
 ####### GLOBAL PARAMETERS ########
 Temp = 291
 ρ_air = 1.225
 c = 343.2*sqrt(Temp/293)
-freq = 150
-fs = 1200
-Time = 0.8
+freq = 500
+fs = 2000
+Time = 1.2
 po = 2e-5
 p0 = 2e-5
 
@@ -69,13 +75,13 @@ Z_a_wood = 2200500
 #R = [Z_a_wood, Z_a_wood, Z_a_wood, Z_a_wood, Z_a_wood, Z_a_wood, Z_a_wood]
 #R = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
 
-#R = [1,1,1,1,1,1,1]
+R = [-0.17,-0.17,-0.17,-0.17,-0.17,-0.17,-0.17]
 #R = [Z_T, Z_T, Z_T, Z_T, Z_T, Z_T, Z_T]
 #R = [0,0,0,0,0,0]
 
 # What type of source should be used. priority directional -> harmonic -> impulse
-impulse = true
-harmonic = false
+impulse = false
+harmonic = true
 harmonic_directional = false
 
 # Positions for the different sources and microphone positions. Given in meters
@@ -188,7 +194,7 @@ function plot_arrays(arr1::Array, arr2::Array, arr3::Array, Δt::Float64)
     xlabel!("Time (s)")
     ylabel!("Magnitude (dB)")
     title!("Time weighted sound pressure \nlevel at three positions")
-    #ylims!((0,120))
+    ylims!((0,100))
     Plots.savefig(string("R=",R[1], " ",freq, " Hz  fs ",fs ," source ", impulse ? "Impulse" : "Harmonic",".png"))
 end
 
@@ -216,6 +222,9 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
     sound_level = 144.0
     WHITE_NOISE = generate_noise_signal(N, Δt, sound_level)
 
+    sweep, sweep_length = logarithmic_sweep(30,1000,3,fs)
+
+
     # Create arrays for data collection for plots and heatmaps.
     p_arr = Float64[]
     meas_pos1 = []
@@ -236,12 +245,12 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
     IS_sum = []
     IW_sum = []
     IU_sum = []
-    ID_sum = [] 
+    ID_sum = []
 
     # Track the progress using progressmeter to better visualize ETA
     prog1 = Progress(N)
 
-
+    
     ######## Step 1 - Insert energy into grid
 
     # Iterate through the matrix with timesteps "n" for a given total time "T"
@@ -262,14 +271,16 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
             IU[i,j,k] = imp_val_p
             ID[i,j,k] = imp_val_p
         end
-
-         # Use the global boolean parameter ´harmonic´ if the grid should experience a harmonic time signal - Will work as a point source located at a single node 
+       
+        # Use the global boolean parameter ´harmonic´ if the grid should experience a harmonic time signal - Will work as a point source located at a single node 
         if (harmonic == true) && (n <= _time_to_samples(time_source,Δt))
 
             if n == 1
-                println("Insert Harmonic signal")
-                println("Time_to_samples for ",time_source, " s - ", _time_to_samples(time_source,Δt))
+                println("Insert sweep")
+                #println("Time_to_samples for ",time_source, " s - ", _time_to_samples(time_source,Δt))
             end
+
+            #A_val = 10* sweep[n]
             # Locate the discrete indicies from the real positions
             i = _real_to_index(harm_pos,Δd)[1]
             j = _real_to_index(harm_pos,Δd)[2]
@@ -330,7 +341,7 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
         push!(meas_pos2, meas2)
         push!(meas_pos3, meas3)
 
-        push!(p_arr, sqrt((1/(L*M*N_length))*sum(pressure_grid.^2)))
+        #push!(p_arr, sqrt((1/(L*M*N_length))*sum(pressure_grid.^2)))
         
         
 
@@ -395,7 +406,8 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
 
     # Create a pressure array using the ´_Lp´ function
     #p_arr = _Lp(p_arr)
-    #Plots.plot(x, abs.(p_arr), xlabel="Time (s)", ylabel="Pressure", label="Overall Pressure", title=string("Total energy with R=1\nmax val: ", @sprintf("%.3e",maximum(p_arr)), "     min val: ", @sprintf("%.3e",minimum(p_arr))), yaxis=:log10)
+    #Plots.plot(x,press_arr)
+    #Plots.plot(x, press_arr, xlabel="Time (s)", ylabel="Pressure", label="Overall Pressure", title=string("Total energy with R=1\nmax val: ", @sprintf("%.3e",maximum(p_arr)), "     min val: ", @sprintf("%.3e",minimum(p_arr))), yaxis=:log10)
     #Plots.plot(x, IN_sum.-IS_sum, label="IN_sum")
     #Plots.plot!(x, IE_sum.-IW_sum, label="IE_sum")
     #Plots.plot!(x, p_arr, label="Overall pressure")
@@ -413,8 +425,8 @@ function iterate_grid(T::Float64, Δd, pressure_grid::Array{Float64,3}, SN::Arra
    
    
     # Different actions to be done on the finished result. remve comment mark and edit the input parameters to alter the functions.
-    find_t60(10*log10.((p_arr.^2) / p0^2), x, _time_to_samples(time_source,Δt)-10, L*Δd, M*Δd, N_length*Δd)
-    #plot_arrays(p1, p1_2, p1_3, Δt)
+    #find_t60(10*log10.((p_arr.^2) / p0^2), x, _time_to_samples(time_source,Δt)-10, L*Δd, M*Δd, N_length*Δd)
+    plot_arrays(p1, p1_2, p1_3, Δt)
     #_heatmap_gif11(gif_arr_x, N,x, Δd, string("R=",R[1], " ",freq, " Hz  fs ",fs , " ",T," s source ", impulse ? "Impulse" : "Harmonic" ," x plane.gif"))
     #_heatmap_gif11(gif_arr_y, N,x, Δd, string("R=",R[1], " ",freq, " Hz  fs ",fs , " ",T," s source ", impulse ? "Impulse" : "Harmonic" ," y plane.gif"))
     #_heatmap_gif11(gif_arr_z, N,x, Δd, string("R=",R[1], " ",freq, " Hz  fs ",fs , " ",T," s source ", impulse ? "Impulse" : "Harmonic" ," z plane.gif"))
@@ -428,11 +440,7 @@ end
 ###### Main code 
 
 # create the distance value between each node in the TLM matrix
-Δd =  c / fs
-
-
-
-
+Δd =  c / (freq * 10)
 
 # Verify that the given distance value satisfy a given amount of points per wavelength of the given frequency
 check_fs(fs)

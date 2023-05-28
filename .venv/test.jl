@@ -1,103 +1,20 @@
+using Plots
 
-
-function replace_value_PN(PN, SS, LBL, I)
-    # Find all positions of value I in LBL
-    positions = findall(x -> x == I, LBL)
-
-    # Iterate over the positions
-    for pos in positions
-        row, col, depth = pos.I  # Access CartesianIndex components directly
-        println(pos.I)
-
-        # Replace the value in PN with the corresponding value from SS
-        PN[row, col, depth] = SS[row, col-1, depth]
-    end
+function logarithmic_sweep(start_freq, end_freq, total_duration, sample_rate)
+    start_freq = max(start_freq, 1e-15)  # Avoid negative or zero frequencies
+    end_freq = max(end_freq, 1e-15)
     
-    return PN
-end
-
-
-function replace_value_PE(PE, SW, LBL, I)
-    # Find all positions of value I in LBL
-    positions = findall(x -> x == I, LBL)
-
-    # Iterate over the positions
-    for pos in positions
-        row, col, depth = pos.I  # Access CartesianIndex components directly
-        println(pos.I)
-
-        # Replace the value in PN with the corresponding value from SS
-        PE[row, col, depth] = SW[row+1, col, depth]
-    end
-    return PE
-end
-
-
-function replace_value_PE(PS, SN, LBL, I)
-    # Find all positions of value I in LBL
-    positions = findall(x -> x == I, LBL)
-
-    # Iterate over the positions
-    for pos in positions
-        row, col, depth = pos.I  # Access CartesianIndex components directly
-        println(pos.I)
-
-        # Replace the value in PN with the corresponding value from SS
-        PS[row, col, depth] = SN[row, col+1, depth]
-    end
+    num_samples = Int(total_duration * sample_rate)
+    t = (0:num_samples-1) / sample_rate
     
-    return PS
-end
-
-
-function replace_value_PE(PW, SE, LBL, I)
-    # Find all positions of value I in LBL
-    positions = findall(x -> x == I, LBL)
-
-    # Iterate over the positions
-    for pos in positions
-        row, col, depth = pos.I  # Access CartesianIndex components directly
-        println(pos.I)
-
-        # Replace the value in PN with the corresponding value from SS
-        PN[row, col, depth] = SS[row, col-1, depth]
-    end
+    start_freq_log = log10(start_freq)
+    end_freq_log = log10(end_freq)
     
-    return PN
-end
-
-function replace_value_PE(PN, SS, LBL, I)
-    # Find all positions of value I in LBL
-    positions = findall(x -> x == I, LBL)
-
-    # Iterate over the positions
-    for pos in positions
-        row, col, depth = pos.I  # Access CartesianIndex components directly
-        println(pos.I)
-
-        # Replace the value in PN with the corresponding value from SS
-        PN[row, col, depth] = SS[row, col-1, depth]
-    end
+    frequencies = 10 .^ (start_freq_log .+ (end_freq_log - start_freq_log) .* t ./ total_duration)
+    phases = 2π * cumsum(frequencies) / sample_rate
+    sweep = sin.(phases)
     
-    return PN
+    return sweep, length(sweep)
 end
 
 
-
-
-
-
-
-PN = cat([1 2 3; 5 4 2; 3 5 6],
-             [1 5 3; 3 1 7; 8 0 1],
-             [1 3 6; 3 7 7; 8 8 2], dims=3)
-
-SS = cat([10 20 30; 50 40 20; 30 50 60],
-             [10 50 30; 30 10 70; 80 0 10],
-             [10 30 60; 30 70 70; 80 80 20], dims=3)
-
-LBL = cat([1 2 3; 5 4 2; 3 5 6],
-             [1 5 3; 3 1 7; 8 0 1],
-             [1 3 6; 3 7 7; 8 8 8], dims=3)
-
-PN = replace_values(PN, SS, LBL, 6)
